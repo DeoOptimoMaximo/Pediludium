@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.env.local
+# raw sample dumps from the probe — never commit unofficial-API payloads
+.probe-samples/
+# local secrets (cookies, tokens) — never commit
+.secrets/
+*.log
+.DS_Store
