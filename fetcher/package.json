@@ -9,17 +9,21 @@
   },
   "scripts": {
     "probe": "node src/probe.ts",
+    "backfill": "node src/backfill.ts",
+    "predict": "node src/predict.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "format": "prettier --write ."
   },
   "dependencies": {
+    "pg": "^8.21.0",
     "playwright-core": "^1.60.0",
     "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/pg": "^8.20.0",
     "prettier": "^3.3.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"

@@ -14,6 +14,7 @@ const ConfigSchema = z.object({
   circuitThreshold: z.coerce.number().int().positive().default(4),
   circuitCooldownMs: z.coerce.number().int().positive().default(15 * 60_000),
   sampleDir: z.string().default('.probe-samples'),
+  dbUrl: z.string().default('postgresql://postgres:postgres@127.0.0.1:56322/postgres'),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -28,6 +29,7 @@ export const config: Config = ConfigSchema.parse({
   circuitThreshold: process.env.SOFA_CIRCUIT_THRESHOLD,
   circuitCooldownMs: process.env.SOFA_CIRCUIT_COOLDOWN_MS,
   sampleDir: process.env.SOFA_SAMPLE_DIR,
+  dbUrl: process.env.SUPABASE_DB_URL,
 });
 
 /**

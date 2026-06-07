@@ -66,3 +66,13 @@ export const EventsResponseSchema = z.object({
   events: z.array(EventSchema),
   hasNextPage: z.boolean().optional(),
 });
+
+// Standings: validate the envelope, read row details from raw (many extra fields).
+export const StandingsResponseSchema = z.object({
+  standings: z.array(
+    z.object({
+      name: z.string().optional(),
+      rows: z.array(z.unknown()),
+    }),
+  ),
+});
