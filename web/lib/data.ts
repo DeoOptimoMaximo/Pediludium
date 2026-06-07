@@ -1,5 +1,13 @@
 import { supa } from './supabase';
-import { BASELINE_MODEL, type Prediction, type Rating, type StandingRow, type WcMatch } from './types';
+import {
+  BASELINE_MODEL,
+  type Prediction,
+  type Rating,
+  type StandingRow,
+  type TeamLite,
+  type TeamMatch,
+  type WcMatch,
+} from './types';
 
 /** All WC2026 matches (via the wc2026_match view), chronological. */
 export async function getMatches(): Promise<WcMatch[]> {
@@ -64,4 +72,41 @@ export async function getRatings(): Promise<Rating[]> {
   }
   out.sort((a, b) => b.rating - a.rating);
   return out;
+}
+
+/** All national teams with their Elo rating, sorted by rating desc. */
+export async function getNationalTeams(): Promise<(TeamLite & { rating: number | null })[]> {
+  const [{ data, error }, ratings] = await Promise.all([
+    supa().from('team').select('ss_id, name, short_name, country_alpha2, is_national').eq('is_national', true),
+    getRatings(),
+  ]);
+  if (error) throw error;
+  const rmap = new Map(ratings.map((r) => [r.team_id, r.rating]));
+  const teams = (data ?? []) as TeamLite[];
+  return teams
+    .map((t) => ({ ...t, rating: rmap.get(t.ss_id) ?? null }))
+    .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || (a.name ?? '').localeCompare(b.name ?? ''));
+}
+
+export async function getTeamInfo(id: number): Promise<TeamLite | null> {
+  const { data, error } = await supa()
+    .from('team')
+    .select('ss_id, name, short_name, country_alpha2, is_national')
+    .eq('ss_id', id)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as TeamLite) ?? null;
+}
+
+/** A team's historical matches, newest first. */
+export async function getTeamHistory(id: number): Promise<TeamMatch[]> {
+  const { data, error } = await supa()
+    .from('team_match')
+    .select(
+      'event_id, start_ts, is_home, opponent_id, opponent_name, opponent_alpha2, team_score, opponent_score, result, tournament_name, season_year',
+    )
+    .eq('team_id', id)
+    .order('start_ts', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as TeamMatch[];
 }

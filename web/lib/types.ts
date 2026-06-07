@@ -51,4 +51,26 @@ export interface Rating {
   team: { name: string | null; short_name: string | null; country_alpha2: string | null } | null;
 }
 
+export interface TeamLite {
+  ss_id: number;
+  name: string | null;
+  short_name: string | null;
+  country_alpha2: string | null;
+  is_national: boolean | null;
+}
+
+export interface TeamMatch {
+  event_id: number;
+  start_ts: string | null;
+  is_home: boolean | null;
+  opponent_id: number | null;
+  opponent_name: string | null;
+  opponent_alpha2: string | null;
+  team_score: number | null;
+  opponent_score: number | null;
+  result: 'W' | 'D' | 'L' | null;
+  tournament_name: string | null;
+  season_year: string | null;
+}
+
 export const BASELINE_MODEL = 'baseline-poisson-elo-v1';
