@@ -5,6 +5,13 @@ mora se dohvaćati **pametno i stabilno**. Ovaj dokument je pravilnik za svaki r
 
 ## 1. Model blokiranja — najvažnije za arhitekturu
 
+> ⚠️ **AŽURIRANO 2026-06-07 (vidi [07](./07-day1-probe-results.md)):** uživo test pokazao je da
+> blokada **više nije samo o IP-u**. S hrvatskog residential IP-a, isti trenutak: curl/Node
+> `undici` → **403** (Varnish edge), pravi **Chrome → 200** (nginx). Dakle blok je primarno po
+> **TLS/HTTP fingerprintu klijenta**. Residential IP je nužan ali NEdovoljan — transport mora
+> biti **pravi browser** (Playwright `channel: 'chrome'`, vidi `fetcher/src/browser.ts`). Donji
+> model (IP-tip) i dalje vrijedi kao *dodatni* sloj, ali fingerprint je odlučujući.
+
 Blokira se po **tipu IP adrese**, ne po zemlji:
 
 ```mermaid
