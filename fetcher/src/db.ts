@@ -221,6 +221,58 @@ export async function upsertPrediction(p: PredictionRow): Promise<void> {
   );
 }
 
+export interface TeamMatchRow {
+  team_id: number;
+  event_id: number;
+  start_ts?: string | null;
+  is_home?: boolean | null;
+  opponent_id?: number | null;
+  opponent_name?: string | null;
+  opponent_alpha2?: string | null;
+  team_score?: number | null;
+  opponent_score?: number | null;
+  result?: 'W' | 'D' | 'L' | null;
+  tournament_id?: number | null;
+  tournament_name?: string | null;
+  season_year?: string | null;
+  status_type?: string | null;
+  raw?: unknown;
+}
+
+export async function upsertTeamMatch(m: TeamMatchRow): Promise<void> {
+  await dbQuery(
+    `insert into public.team_match
+       (team_id, event_id, start_ts, is_home, opponent_id, opponent_name, opponent_alpha2,
+        team_score, opponent_score, result, tournament_id, tournament_name, season_year,
+        status_type, raw, fetched_at)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, now())
+     on conflict (team_id, event_id) do update set
+       start_ts=excluded.start_ts, is_home=excluded.is_home, opponent_id=excluded.opponent_id,
+       opponent_name=excluded.opponent_name, opponent_alpha2=excluded.opponent_alpha2,
+       team_score=excluded.team_score, opponent_score=excluded.opponent_score, result=excluded.result,
+       tournament_id=excluded.tournament_id, tournament_name=excluded.tournament_name,
+       season_year=excluded.season_year, status_type=excluded.status_type, raw=excluded.raw,
+       fetched_at=now()`,
+    [
+      m.team_id,
+      m.event_id,
+      m.start_ts ?? null,
+      m.is_home ?? null,
+      m.opponent_id ?? null,
+      m.opponent_name ?? null,
+      m.opponent_alpha2 ?? null,
+      m.team_score ?? null,
+      m.opponent_score ?? null,
+      m.result ?? null,
+      m.tournament_id ?? null,
+      m.tournament_name ?? null,
+      m.season_year ?? null,
+      m.status_type ?? null,
+      m.raw ?? null,
+    ],
+  );
+}
+
 export async function upsertTeamRating(
   teamId: number,
   model: string,

@@ -10,6 +10,7 @@
   "scripts": {
     "probe": "node src/probe.ts",
     "backfill": "node src/backfill.ts",
+    "history": "node src/history.ts",
     "predict": "node src/predict.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
