@@ -34,7 +34,14 @@ export async function upsertTournament(t: TournamentRow): Promise<void> {
      on conflict (ss_id) do update set
        slug=excluded.slug, name=excluded.name, category_id=excluded.category_id,
        category_slug=excluded.category_slug, raw=excluded.raw, fetched_at=now()`,
-    [t.ss_id, t.slug ?? null, t.name ?? null, t.category_id ?? null, t.category_slug ?? null, t.raw ?? null],
+    [
+      t.ss_id,
+      t.slug ?? null,
+      t.name ?? null,
+      t.category_id ?? null,
+      t.category_slug ?? null,
+      t.raw ?? null,
+    ],
   );
 }
 
@@ -270,6 +277,55 @@ export async function upsertTeamMatch(m: TeamMatchRow): Promise<void> {
       m.season_year ?? null,
       m.status_type ?? null,
       m.raw ?? null,
+    ],
+  );
+}
+
+export interface SimulationRow {
+  season_id: number;
+  team_id: number;
+  model_version: string;
+  iterations?: number | null;
+  exp_group_points?: number | null;
+  p_win_group?: number | null;
+  p_runner_up?: number | null;
+  p_third?: number | null;
+  p_advance?: number | null;
+  p_r16?: number | null;
+  p_qf?: number | null;
+  p_sf?: number | null;
+  p_final?: number | null;
+  p_win_cup?: number | null;
+}
+
+export async function upsertSimulation(s: SimulationRow): Promise<void> {
+  await dbQuery(
+    `insert into public.tournament_simulation
+       (season_id, team_id, model_version, iterations, exp_group_points,
+        p_win_group, p_runner_up, p_third, p_advance,
+        p_r16, p_qf, p_sf, p_final, p_win_cup, updated_at)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now())
+     on conflict (season_id, team_id, model_version) do update set
+       iterations=excluded.iterations, exp_group_points=excluded.exp_group_points,
+       p_win_group=excluded.p_win_group, p_runner_up=excluded.p_runner_up,
+       p_third=excluded.p_third, p_advance=excluded.p_advance,
+       p_r16=excluded.p_r16, p_qf=excluded.p_qf, p_sf=excluded.p_sf,
+       p_final=excluded.p_final, p_win_cup=excluded.p_win_cup, updated_at=now()`,
+    [
+      s.season_id,
+      s.team_id,
+      s.model_version,
+      s.iterations ?? null,
+      s.exp_group_points ?? null,
+      s.p_win_group ?? null,
+      s.p_runner_up ?? null,
+      s.p_third ?? null,
+      s.p_advance ?? null,
+      s.p_r16 ?? null,
+      s.p_qf ?? null,
+      s.p_sf ?? null,
+      s.p_final ?? null,
+      s.p_win_cup ?? null,
     ],
   );
 }

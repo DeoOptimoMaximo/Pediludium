@@ -18,17 +18,22 @@ miješanje prijateljskih i kvalifikacijskih utakmica bez težina, nezavisnost go
 (podcjenjuje 0:0/1:1), knockout placeholderi (npr. "Winner Group A") nemaju povijest →
 neutralna predikcija dok se ne odigra grupa.
 
-## Advanced — TODO/TBD (preporučeni redoslijed po omjeru korist/trud)
+## Advanced — status (preporučeni redoslijed po omjeru korist/trud)
 
-| # | Tehnika | Zašto / što daje | Izvor podataka |
-|---|---------|------------------|----------------|
-| 1 | **Dixon-Coles** | Korekcija za niske rezultate (0:0,1:0,0:1,1:1) + **eksponencijalno vremensko ponderiranje** (novije utakmice teže) | postojeća povijest |
-| 2 | **Opponent/confederation adjustment** | Kvalifikacije UEFA ≠ CONCACAF; ponderiraj snagu protivnika i tip natjecanja | `tournament`/`category` iz eventa |
-| 3 | **xG umjesto golova** | Realizirani golovi su bučni; xG je stabilniji procjenitelj λ | `GET /event/{id}/statistics` |
-| 4 | **Market-odds blend** | Kvote su jak prior (tržište agregira sve); blendaj s modelom | `GET /event/{id}/odds/1/all` |
-| 5 | **Monte-Carlo simulacija turnira** | Iz per-match λ simuliraj cijeli turnir N×10⁴ → **vjerojatnost prolaska grupe / osvajanja SP-a** | naš `match` + `prediction` |
-| 6 | **Bayesian hierarchical / Bivariate Poisson** | Dijeljena snaga napada/obrane, korelacija golova, nesigurnost (intervali) | PyMC/Stan offline → upiši `prediction` |
-| 7 | **Gradient boosting** | Feature eng.: forma, odmor, putovanje, vrijednost kadra, ozljede | više endpointa + vanjski |
+| # | Tehnika | Status | Zašto / što daje | Izvor podataka |
+|---|---------|--------|------------------|----------------|
+| 1 | **Dixon-Coles** | ✅ `dixon-coles-v1` (docs/13) | Korekcija za niske rezultate (0:0,1:0,0:1,1:1) + **eksponencijalno vremensko ponderiranje** (novije utakmice teže) | postojeća povijest |
+| 2 | **Opponent/confederation adjustment** | ⬜ TODO (sljedeće) | Kvalifikacije UEFA ≠ CONCACAF; ponderiraj snagu protivnika i tip natjecanja | `tournament`/`category` iz eventa |
+| 3 | **xG umjesto golova** | ⬜ TODO | Realizirani golovi su bučni; xG je stabilniji procjenitelj λ | `GET /event/{id}/statistics` |
+| 4 | **Market-odds blend** | ⬜ TODO | Kvote su jak prior (tržište agregira sve); blendaj s modelom | `GET /event/{id}/odds/1/all` |
+| 5 | **Monte-Carlo simulacija turnira** | ✅ `mc-sim-v1` (docs/13) | Iz per-match λ simuliraj cijeli turnir N×10⁴ → **vjerojatnost prolaska grupe / osvajanja SP-a** | naš `match` + DC fit |
+| 6 | **Bayesian hierarchical / Bivariate Poisson** | ⬜ TODO | Dijeljena snaga napada/obrane, korelacija golova, nesigurnost (intervali) | PyMC/Stan offline → upiši `prediction` |
+| 7 | **Gradient boosting** | ⬜ TODO | Feature eng.: forma, odmor, putovanje, vrijednost kadra, ozljede | više endpointa + vanjski |
+
+> **Implementirano (2026-06-08):** koraci #1 i #5 — vidi [`13-simulation-model.md`](./13-simulation-model.md).
+> Oba modela rade iz baze (nula SofaScore poziva), spremaju se uz baseline (`model_version`),
+> i napajaju `/simulation` (Forecast) te `/predictions` toggle u webu. **Sljedeće: korak #2**
+> (opponent-strength), jer DC rating je trenutno čisto form-based.
 
 ### Arhitektura napredne predikcije
 - Trenira se **offline** (Python/PyMC ili TS), rezultat upisuje u `prediction` s novim

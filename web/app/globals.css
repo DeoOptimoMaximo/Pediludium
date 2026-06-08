@@ -95,6 +95,23 @@ h2 { font-size: 1.25rem; }
 .predlegend { display: flex; justify-content: space-between; font-size: .72rem; color: var(--muted); margin-top: 5px; }
 .predlegend b { color: var(--text); font-variant-numeric: tabular-nums; }
 
+/* probability bar (forecast / advance) */
+.probwrap { display: flex; align-items: center; gap: 8px; }
+.probbar { flex: 1; height: 6px; min-width: 40px; background: var(--bg-soft); border-radius: 5px; overflow: hidden; }
+.probbar .fill { display: block; height: 100%; border-radius: 5px; }
+.probbar .fill.accent { background: var(--accent); }
+.probbar .fill.home { background: var(--home); }
+.probbar .fill.muted { background: var(--draw); }
+.probval { font-variant-numeric: tabular-nums; min-width: 36px; text-align: right; font-size: .82rem; }
+table.tbl td.num { font-variant-numeric: tabular-nums; }
+.simtbl td, .simtbl th { padding: 8px 10px; }
+
+/* model toggle */
+.toggle { display: inline-flex; gap: 4px; background: var(--bg-soft); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+.toggle a { padding: 5px 12px; border-radius: 8px; font-size: .84rem; font-weight: 600; color: var(--muted); }
+.toggle a.on { background: var(--card-hi); color: var(--text); border: 1px solid var(--line); }
+.toggle a:hover { color: var(--text); }
+
 /* standings table */
 table.tbl { width: 100%; border-collapse: collapse; font-size: .88rem; }
 table.tbl th, table.tbl td { padding: 7px 8px; text-align: center; }

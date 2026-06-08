@@ -88,4 +88,33 @@ export interface EventDetail {
   away: EventSide;
 }
 
+export interface TournamentSim {
+  team_id: number;
+  iterations: number | null;
+  exp_group_points: number | null;
+  p_win_group: number | null;
+  p_runner_up: number | null;
+  p_third: number | null;
+  p_advance: number | null;
+  p_r16: number | null;
+  p_qf: number | null;
+  p_sf: number | null;
+  p_final: number | null;
+  p_win_cup: number | null;
+  team: { name: string | null; short_name: string | null; country_alpha2: string | null } | null;
+}
+
+// model_version identifiers used across the app (the schema versions predictions/sims)
 export const BASELINE_MODEL = 'baseline-poisson-elo-v1';
+export const DC_MODEL = 'dixon-coles-v1';
+export const SIM_MODEL = 'mc-sim-v1';
+
+export interface PredModel {
+  key: 'dc' | 'baseline';
+  version: string;
+  label: string;
+}
+export const PRED_MODELS: Record<'dc' | 'baseline', PredModel> = {
+  dc: { key: 'dc', version: DC_MODEL, label: 'Dixon-Coles' },
+  baseline: { key: 'baseline', version: BASELINE_MODEL, label: 'Elo + Poisson' },
+};

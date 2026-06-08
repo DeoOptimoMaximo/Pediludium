@@ -1,13 +1,17 @@
 import Link from 'next/link';
-import { getStandings } from '@/lib/data';
-import { flag } from '@/lib/format';
+import { getSimulations, getStandings } from '@/lib/data';
+import { flag, pct } from '@/lib/format';
 import type { StandingRow } from '@/lib/types';
 import { RealtimeRefresh } from '../components/RealtimeRefresh';
 
 export const dynamic = 'force-dynamic';
 
 export default async function GroupsPage() {
-  const rows = await getStandings();
+  const [rows, sims] = await Promise.all([getStandings(), getSimulations()]);
+  const advOf = new Map<number, number>();
+  for (const s of sims) advOf.set(s.team_id, s.p_advance ?? 0);
+  const hasSim = sims.length > 0;
+
   const groups = new Map<string, StandingRow[]>();
   for (const r of rows) {
     const k = r.group_name ?? 'Other';
@@ -20,6 +24,13 @@ export default async function GroupsPage() {
       <h1 style={{ marginTop: 28 }}>Groups & standings</h1>
       <p className="muted">
         12 groups of 4. Tables update live once matches kick off (all zeros pre-tournament).
+        {hasSim && (
+          <>
+            {' '}
+            <b>Adv</b> = chance of reaching the Round of 32 from the{' '}
+            <Link href="/simulation" className="teamlink">forecast</Link>.
+          </>
+        )}
       </p>
 
       <div className="grid cols-2">
@@ -40,6 +51,7 @@ export default async function GroupsPage() {
                   <th>GF</th>
                   <th>GA</th>
                   <th>Pts</th>
+                  {hasSim && <th>Adv</th>}
                 </tr>
               </thead>
               <tbody>
@@ -59,6 +71,11 @@ export default async function GroupsPage() {
                     <td>{r.goals_for ?? 0}</td>
                     <td>{r.goals_against ?? 0}</td>
                     <td className="pts">{r.points ?? 0}</td>
+                    {hasSim && (
+                      <td className="num" style={{ color: 'var(--accent)' }}>
+                        {r.team_id != null && advOf.has(r.team_id) ? `${pct(advOf.get(r.team_id))}%` : '–'}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

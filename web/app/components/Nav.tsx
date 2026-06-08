@@ -8,6 +8,7 @@ const LINKS = [
   ['/groups', 'Groups'],
   ['/teams', 'Teams'],
   ['/predictions', 'Predictions'],
+  ['/simulation', 'Forecast'],
 ] as const;
 
 export function Nav() {

@@ -1,11 +1,13 @@
 import { supa } from './supabase';
 import {
-  BASELINE_MODEL,
+  DC_MODEL,
+  SIM_MODEL,
   type Prediction,
   type Rating,
   type StandingRow,
   type TeamLite,
   type TeamMatch,
+  type TournamentSim,
   type WcMatch,
 } from './types';
 
@@ -25,24 +27,35 @@ export async function getMatch(id: number): Promise<WcMatch | null> {
   return (data as WcMatch) ?? null;
 }
 
-/** Baseline predictions keyed by match id. */
-export async function getPredictions(): Promise<Map<number, Prediction>> {
-  const { data, error } = await supa().from('prediction').select('*').eq('model_version', BASELINE_MODEL);
+/** Predictions keyed by match id. Defaults to the Dixon-Coles model (best available). */
+export async function getPredictions(model: string = DC_MODEL): Promise<Map<number, Prediction>> {
+  const { data, error } = await supa().from('prediction').select('*').eq('model_version', model);
   if (error) throw error;
   const map = new Map<number, Prediction>();
   for (const p of (data ?? []) as Prediction[]) map.set(p.match_id, p);
   return map;
 }
 
-export async function getPrediction(matchId: number): Promise<Prediction | null> {
+export async function getPrediction(matchId: number, model: string = DC_MODEL): Promise<Prediction | null> {
   const { data, error } = await supa()
     .from('prediction')
     .select('*')
-    .eq('model_version', BASELINE_MODEL)
+    .eq('model_version', model)
     .eq('match_id', matchId)
     .maybeSingle();
   if (error) throw error;
   return (data as Prediction) ?? null;
+}
+
+/** Monte-Carlo tournament simulation rows, longest title odds first. */
+export async function getSimulations(model: string = SIM_MODEL): Promise<TournamentSim[]> {
+  const { data, error } = await supa()
+    .from('tournament_simulation')
+    .select('*, team:team_id(name, short_name, country_alpha2)')
+    .eq('model_version', model)
+    .order('p_win_cup', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as TournamentSim[];
 }
 
 export async function getStandings(): Promise<StandingRow[]> {
