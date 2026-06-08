@@ -67,6 +67,11 @@ export const EventsResponseSchema = z.object({
   hasNextPage: z.boolean().optional(),
 });
 
+// Single event detail: GET /event/{id}
+export const EventResponseSchema = z.object({
+  event: EventSchema,
+});
+
 // Standings: validate the envelope, read row details from raw (many extra fields).
 export const StandingsResponseSchema = z.object({
   standings: z.array(

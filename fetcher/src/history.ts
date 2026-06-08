@@ -51,9 +51,11 @@ function rowOf(teamId: number, e: AnyObj): TeamMatchRow | null {
 
 async function main(): Promise<void> {
   const cutoff = Date.now() / 1000 - YEARS * 365.25 * 24 * 3600;
-  const teams = await dbQuery<{ ss_id: string; name: string }>(
+  const only = process.argv.find((a) => a.startsWith('--team='))?.split('=')[1];
+  let teams = await dbQuery<{ ss_id: string; name: string }>(
     'select ss_id, name from public.team where is_national order by name',
   );
+  if (only) teams = teams.filter((t) => String(t.ss_id) === only);
   console.log(`\n=== Pediludium history — last ${YEARS}y for ${teams.length} teams ===\n`);
 
   let grandTotal = 0;

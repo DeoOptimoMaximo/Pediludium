@@ -11,6 +11,8 @@
     "probe": "node src/probe.ts",
     "backfill": "node src/backfill.ts",
     "history": "node src/history.ts",
+    "refresh": "node src/refresh.ts",
+    "scheduler": "node src/scheduler.ts",
     "predict": "node src/predict.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

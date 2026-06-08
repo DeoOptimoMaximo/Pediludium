@@ -120,7 +120,8 @@ export async function upsertMatch(m: MatchRow): Promise<void> {
        start_ts=excluded.start_ts, status_type=excluded.status_type, status_code=excluded.status_code,
        winner_code=excluded.winner_code, home_score=excluded.home_score, away_score=excluded.away_score,
        home_score_ht=excluded.home_score_ht, away_score_ht=excluded.away_score_ht,
-       round=excluded.round, round_name=excluded.round_name, group_name=excluded.group_name,
+       round=excluded.round, round_name=excluded.round_name,
+       group_name=coalesce(excluded.group_name, match.group_name),
        raw=excluded.raw, fetched_at=now()`,
     [
       m.ss_id,
