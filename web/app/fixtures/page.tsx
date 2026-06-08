@@ -2,6 +2,7 @@ import { getMatches, getPredictions } from '@/lib/data';
 import { dayKey, fmtDay } from '@/lib/format';
 import type { WcMatch } from '@/lib/types';
 import { MatchRow } from '../components/MatchRow';
+import { RealtimeRefresh } from '../components/RealtimeRefresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +17,7 @@ export default async function FixturesPage() {
 
   return (
     <>
+      <RealtimeRefresh table="match" />
       <h1 style={{ marginTop: 28 }}>Fixtures</h1>
       <p className="muted">{matches.length} matches · all times Europe/Zagreb</p>
 

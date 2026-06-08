@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { getMatch, getPrediction } from '@/lib/data';
 import { fmtDay, fmtTime, isLive, pct } from '@/lib/format';
 import { TeamInline } from '../../components/TeamInline';
+import { RealtimeRefresh } from '../../components/RealtimeRefresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
 
   return (
     <>
+      <RealtimeRefresh table="match" filter={`ss_id=eq.${matchId}`} />
       <p style={{ marginTop: 24 }}>
         <Link href="/fixtures" className="muted small">
           ← Fixtures

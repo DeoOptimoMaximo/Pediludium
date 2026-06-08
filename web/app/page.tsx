@@ -3,6 +3,7 @@ import { flag, fmtDay } from '@/lib/format';
 import { Countdown } from './components/Countdown';
 import { LiveTicker } from './components/LiveTicker';
 import { MatchRow } from './components/MatchRow';
+import { RealtimeRefresh } from './components/RealtimeRefresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,8 @@ export default async function OverviewPage() {
 
   return (
     <>
+      <RealtimeRefresh table="match" />
+      <RealtimeRefresh table="prediction" channel="rt-pred-overview" />
       <section className="hero">
         <div className="kicker">FIFA World Cup 2026 · USA · Canada · Mexico</div>
         <h1>Pediludium</h1>

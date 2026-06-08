@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { getTeamHistory, getTeamInfo } from '@/lib/data';
 import { flag, fmtDay } from '@/lib/format';
 import type { TeamMatch } from '@/lib/types';
+import { RealtimeRefresh } from '../../components/RealtimeRefresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +30,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
 
   return (
     <>
+      <RealtimeRefresh table="team_match" filter={`team_id=eq.${teamId}`} />
       <p style={{ marginTop: 24 }}>
         <Link href="/teams" className="muted small">
           ← Teams

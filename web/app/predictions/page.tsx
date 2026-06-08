@@ -3,6 +3,7 @@ import { getMatches, getPredictions } from '@/lib/data';
 import { fmtDay } from '@/lib/format';
 import { PredictionBar } from '../components/PredictionBar';
 import { TeamInline } from '../components/TeamInline';
+import { RealtimeRefresh } from '../components/RealtimeRefresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,7 @@ export default async function PredictionsPage() {
 
   return (
     <>
+      <RealtimeRefresh table="prediction" />
       <h1 style={{ marginTop: 28 }}>Predictions</h1>
       <p className="muted">
         Baseline <b>Elo + Poisson</b> model · {fixtures.length} group-stage fixtures

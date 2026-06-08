@@ -1,6 +1,7 @@
 import { getStandings } from '@/lib/data';
 import { flag } from '@/lib/format';
 import type { StandingRow } from '@/lib/types';
+import { RealtimeRefresh } from '../components/RealtimeRefresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,7 @@ export default async function GroupsPage() {
 
   return (
     <>
+      <RealtimeRefresh table="standing" />
       <h1 style={{ marginTop: 28 }}>Groups & standings</h1>
       <p className="muted">
         12 groups of 4. Tables update live once matches kick off (all zeros pre-tournament).
