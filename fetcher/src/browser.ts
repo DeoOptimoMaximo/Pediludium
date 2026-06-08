@@ -3,6 +3,7 @@ import { chromium } from 'playwright-core';
 import { z } from 'zod';
 import { config } from './config.ts';
 import { PoliteClient, RateLimitedError } from './politeness.ts';
+import { detectIphoneSource, startSourceProxy, type SourceProxy } from './source-proxy.ts';
 import type { FetchResult } from './http.ts';
 
 /**
@@ -29,14 +30,31 @@ let browser: Browser | undefined;
 let context: BrowserContext | undefined;
 let page: Page | undefined;
 let launching: Promise<Page> | undefined;
+let sourceProxy: SourceProxy | undefined;
+
+/** Resolve egress source IP: explicit SOFA_SOURCE_ADDR, else SOFA_VIA_IPHONE auto-detect. */
+async function resolveProxyServer(): Promise<string | undefined> {
+  const explicit = config.sourceAddr;
+  const viaIphone = process.env.SOFA_VIA_IPHONE === '1';
+  const src = explicit ?? (viaIphone ? detectIphoneSource() : undefined);
+  if (!src) {
+    if (viaIphone) console.warn('[browser] SOFA_VIA_IPHONE set but no 172.20.10.x tether found');
+    return undefined;
+  }
+  sourceProxy = await startSourceProxy(src);
+  console.log(`[browser] egress bound to ${src} via proxy 127.0.0.1:${sourceProxy.port}`);
+  return `http://127.0.0.1:${sourceProxy.port}`;
+}
 
 async function ensurePage(): Promise<Page> {
   if (page) return page;
   if (!launching) {
     launching = (async () => {
+      const proxyServer = await resolveProxyServer();
       browser = await chromium.launch({
         channel: 'chrome', // use the system Google Chrome, not bundled Chromium
         headless: process.env.SOFA_HEADLESS === '1',
+        ...(proxyServer ? { proxy: { server: proxyServer } } : {}),
       });
       // No UA override: let real Chrome send its genuine UA + client hints (most browser-like).
       context = await browser.newContext({ locale: 'en-US' });
@@ -86,8 +104,10 @@ export async function getJson<T>(path: string, schema: z.ZodType<T>): Promise<Fe
 /** Tear down Chrome. Call once at the end of a run. */
 export async function closeBrowser(): Promise<void> {
   if (browser) await browser.close();
+  if (sourceProxy) sourceProxy.close();
   browser = undefined;
   context = undefined;
   page = undefined;
   launching = undefined;
+  sourceProxy = undefined;
 }

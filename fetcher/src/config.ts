@@ -15,6 +15,9 @@ const ConfigSchema = z.object({
   circuitCooldownMs: z.coerce.number().int().positive().default(15 * 60_000),
   sampleDir: z.string().default('.probe-samples'),
   dbUrl: z.string().default('postgresql://postgres:postgres@127.0.0.1:56322/postgres'),
+  // egress source IP for browser fetches (e.g. iPhone tether 172.20.10.x → mobile IP).
+  // Empty = use default route. Or set SOFA_VIA_IPHONE=1 to auto-detect the tether.
+  sourceAddr: z.string().optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -30,6 +33,7 @@ export const config: Config = ConfigSchema.parse({
   circuitCooldownMs: process.env.SOFA_CIRCUIT_COOLDOWN_MS,
   sampleDir: process.env.SOFA_SAMPLE_DIR,
   dbUrl: process.env.SUPABASE_DB_URL,
+  sourceAddr: process.env.SOFA_SOURCE_ADDR,
 });
 
 /**
