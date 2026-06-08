@@ -57,20 +57,32 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           }}
         >
           <div style={{ fontSize: '1.25rem', display: 'flex', justifyContent: 'flex-end' }}>
-            <TeamInline name={m.home_name} short={m.home_short} alpha2={m.home_alpha2} align="right" />
+            {m.home_team_id ? (
+              <Link href={`/team/${m.home_team_id}`} className="teamlink">
+                <TeamInline name={m.home_name} short={m.home_short} alpha2={m.home_alpha2} align="right" />
+              </Link>
+            ) : (
+              <TeamInline name={m.home_name} short={m.home_short} alpha2={m.home_alpha2} align="right" />
+            )}
           </div>
           <div className="score" style={{ fontSize: '2rem', minWidth: 90 }}>
             {showScore ? `${m.home_score ?? 0}–${m.away_score ?? 0}` : <span className="vs">v</span>}
           </div>
           <div style={{ fontSize: '1.25rem' }}>
-            <TeamInline name={m.away_name} short={m.away_short} alpha2={m.away_alpha2} />
+            {m.away_team_id ? (
+              <Link href={`/team/${m.away_team_id}`} className="teamlink">
+                <TeamInline name={m.away_name} short={m.away_short} alpha2={m.away_alpha2} />
+              </Link>
+            ) : (
+              <TeamInline name={m.away_name} short={m.away_short} alpha2={m.away_alpha2} />
+            )}
           </div>
         </div>
       </div>
 
       <div className="grid cols-2" style={{ marginTop: 14 }}>
         <div className="card">
-          <h2>Prediction · baseline</h2>
+          <h2>Prediction{p ? ` · ${p.model_version}` : ''}</h2>
           {p ? (
             <>
               <div className="big-pred">
@@ -130,12 +142,11 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           </p>
         </div>
         <div className="card">
-          <h2>
-            Advanced model <span className="chip tbd">TODO</span>
-          </h2>
+          <h2>Advanced model</h2>
           <p className="small muted">
-            Dixon-Coles, market-odds blend, Monte-Carlo advance probability. See
-            <code> docs/08</code>.
+            <b>Dixon-Coles</b> powers this prediction; tournament advance &amp; title odds come from a{' '}
+            <Link href="/simulation" className="teamlink">Monte-Carlo simulation</Link>. Next:
+            opponent-strength weighting &amp; market-odds blend (<code>docs/08</code>).
           </p>
         </div>
       </div>
