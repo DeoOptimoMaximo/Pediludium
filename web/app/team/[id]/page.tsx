@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getTeamHistory, getTeamInfo } from '@/lib/data';
-import { flag, fmtDay } from '@/lib/format';
+import { getTeamHistory, getTeamInfo, getTeamUpcoming } from '@/lib/data';
+import { flag, fmtDay, fmtTime } from '@/lib/format';
 import type { TeamMatch } from '@/lib/types';
 import { RealtimeRefresh } from '../../components/RealtimeRefresh';
 
@@ -10,7 +10,11 @@ export const dynamic = 'force-dynamic';
 export default async function TeamPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const teamId = Number(id);
-  const [team, history] = await Promise.all([getTeamInfo(teamId), getTeamHistory(teamId)]);
+  const [team, history, upcoming] = await Promise.all([
+    getTeamInfo(teamId),
+    getTeamHistory(teamId),
+    getTeamUpcoming(teamId),
+  ]);
   if (!team) notFound();
 
   const w = history.filter((h) => h.result === 'W').length;
@@ -87,6 +91,51 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
         )}
       </div>
 
+      {/* FUTURE — upcoming WC2026 fixtures (soonest first) */}
+      {upcoming.length > 0 && (
+        <div>
+          <div className="dayhdr">
+            <h3>Upcoming</h3>
+            <span className="muted small">{upcoming.length}</span>
+            <span className="ln" />
+          </div>
+          <div className="card" style={{ padding: '4px 14px' }}>
+            {upcoming.map((m) => {
+              const isHome = m.home_team_id === teamId;
+              const oppName = isHome ? m.away_name : m.home_name;
+              const oppAlpha2 = isHome ? m.away_alpha2 : m.home_alpha2;
+              const live = m.status_type === 'inprogress';
+              return (
+                <Link className="urow" key={m.ss_id} href={`/match/${m.ss_id}`}>
+                  <span className="hdate">{fmtDay(m.start_ts)}</span>
+                  <span className="venue" style={{ justifySelf: 'center' }}>{isHome ? 'H' : 'A'}</span>
+                  <span className="hopp">
+                    <span className="flag">{flag(oppAlpha2)}</span>
+                    <span className="nm">{oppName ?? 'TBD'}</span>
+                  </span>
+                  <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    {live ? (
+                      <span className="chip live">LIVE</span>
+                    ) : (
+                      <span className="kick">{fmtTime(m.start_ts)}</span>
+                    )}
+                    {m.group_name && <span className="chip group">{m.group_name}</span>}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* PRESENT limiter — above is FUTURE, below is PAST */}
+      <div className="nowline" role="separator" aria-label="Present — future above, past below">
+        <span className="ln l" />
+        <span className="now">PRESENT</span>
+        <span className="ln r" />
+      </div>
+
+      {/* PAST — historical results grouped by year (newest first) */}
       {[...byYear.entries()].map(([year, ms]) => (
         <div key={year}>
           <div className="dayhdr">

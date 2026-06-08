@@ -178,3 +178,22 @@ table.tbl td.pts { font-weight: 800; }
 
 .teamlink:hover { color: var(--accent); }
 .rank:hover .nm { color: var(--accent); }
+
+/* PRESENT limiter — splits FUTURE (above) from PAST (below) on the team timeline */
+.nowline { display: flex; align-items: center; gap: 12px; margin: 26px 0 10px; }
+.nowline .ln { flex: 1; height: 2px; }
+.nowline .ln.l { background: linear-gradient(90deg, transparent, var(--accent)); }
+.nowline .ln.r { background: linear-gradient(90deg, var(--accent), transparent); }
+.nowline .now {
+  color: var(--accent); font-weight: 800; letter-spacing: .18em; font-size: .72rem;
+  border: 1px solid #2dd4a740; border-radius: 999px; padding: 4px 14px; background: #2dd4a712;
+  box-shadow: 0 0 18px #2dd4a722;
+}
+
+/* upcoming fixture row (no result/score yet) */
+.urow { display: grid; grid-template-columns: 78px 26px 1fr auto; align-items: center; gap: 10px;
+  padding: 9px 4px; border-top: 1px solid var(--line); font-size: .9rem; cursor: pointer; border-radius: 8px; }
+.urow:first-child { border-top: none; }
+.urow:hover { background: var(--card-hi); }
+.urow .hdate { color: var(--muted); font-size: .78rem; }
+.urow .kick { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }

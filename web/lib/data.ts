@@ -111,6 +111,18 @@ export async function getTeamInfo(id: number): Promise<TeamLite | null> {
   return (data as TeamLite) ?? null;
 }
 
+/** A team's upcoming WC2026 fixtures (not yet finished), soonest first. */
+export async function getTeamUpcoming(id: number): Promise<WcMatch[]> {
+  const { data, error } = await supa()
+    .from('wc2026_match')
+    .select('*')
+    .or(`home_team_id.eq.${id},away_team_id.eq.${id}`)
+    .neq('status_type', 'finished')
+    .order('start_ts', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as WcMatch[];
+}
+
 /** A team's historical matches, newest first. */
 export async function getTeamHistory(id: number): Promise<TeamMatch[]> {
   const { data, error } = await supa()
