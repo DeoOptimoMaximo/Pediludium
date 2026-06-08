@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getStandings } from '@/lib/data';
 import { flag } from '@/lib/format';
 import type { StandingRow } from '@/lib/types';
@@ -46,8 +47,10 @@ export default async function GroupsPage() {
                   <tr key={`${name}-${r.team_id}`}>
                     <td>{r.position ?? '-'}</td>
                     <td className="name">
-                      <span className="flag">{flag(r.team?.country_alpha2)}</span>{' '}
-                      {r.team?.name ?? r.team?.short_name ?? r.team_id}
+                      <Link href={`/team/${r.team_id}`} className="teamlink">
+                        <span className="flag">{flag(r.team?.country_alpha2)}</span>{' '}
+                        {r.team?.name ?? r.team?.short_name ?? r.team_id}
+                      </Link>
                     </td>
                     <td>{r.played ?? 0}</td>
                     <td>{r.wins ?? 0}</td>

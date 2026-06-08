@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getMatches, getPredictions, getRatings } from '@/lib/data';
 import { flag, fmtDay } from '@/lib/format';
 import { Countdown } from './components/Countdown';
@@ -56,12 +57,12 @@ export default async function OverviewPage() {
             Recent-form rating from match history (baseline).
           </p>
           {top.map((r, i) => (
-            <div className="rank" key={r.team_id}>
+            <Link className="rank" key={r.team_id} href={`/team/${r.team_id}`}>
               <span className="pos">{i + 1}</span>
               <span className="flag">{flag(r.team?.country_alpha2)}</span>
               <span className="nm">{r.team?.name ?? r.team?.short_name ?? r.team_id}</span>
               <span className="rt">{r.rating}</span>
-            </div>
+            </Link>
           ))}
         </div>
       </div>

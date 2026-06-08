@@ -158,3 +158,6 @@ table.tbl td.pts { font-weight: 800; }
 
 .hrow { cursor: pointer; border-radius: 8px; }
 .hrow:hover { background: var(--card-hi); }
+
+.teamlink:hover { color: var(--accent); }
+.rank:hover .nm { color: var(--accent); }
