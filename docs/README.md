@@ -23,6 +23,13 @@ practices.
 | [03-fetching-strategy.md](./03-fetching-strategy.md) | Blokiranje, residential IP, random delay, retry, cache |
 | [04-target-architecture.md](./04-target-architecture.md) | Predložena arhitektura novog sustava |
 | [05-roadmap.md](./05-roadmap.md) | Plan po danima do starta turnira |
+| [06-infra-supabase-coolify.md](./06-infra-supabase-coolify.md) | Supabase lokalni Docker ↔ cloud Coolify konvencija |
+| [07-day1-probe-results.md](./07-day1-probe-results.md) | Dan-1 rezultati: season id, 48 timova, TLS-fingerprint nalaz |
+| [08-prediction-roadmap.md](./08-prediction-roadmap.md) | Baseline → napredni prediktor (TODO/TBD) |
+| [09-egress-and-rate-limits.md](./09-egress-and-rate-limits.md) | IP ban + `--via-iphone` mobilni IP bypass |
+| [10-polite-fetching-playbook.md](./10-polite-fetching-playbook.md) | Nenagresivna obrada velikog request queue-a |
+| [11-android-app-investigation.md](./11-android-app-investigation.md) | Zašto app prolazi a browser ne (OkHttp potpis) |
+| [12-realtime-notes.md](./12-realtime-notes.md) | Realtime end-to-end + REPLICA IDENTITY FULL kvaka |
 
 ## Tech stack (dogovoreno)
 

@@ -54,6 +54,10 @@ Sve je u [`docs/`](./docs/README.md):
 6. [Infra: Supabase/Coolify](./docs/06-infra-supabase-coolify.md) — lokalni Docker ↔ cloud Coolify konvencija
 7. [Dan-1 probe rezultati](./docs/07-day1-probe-results.md) — season id, 48 timova, **TLS-fingerprint nalaz**
 8. [Prediction roadmap](./docs/08-prediction-roadmap.md) — baseline → napredni modeli (TODO/TBD)
+9. [Egress & rate-limits](./docs/09-egress-and-rate-limits.md) — IP ban + **`--via-iphone`** mobilni IP bypass
+10. [Polite fetching playbook](./docs/10-polite-fetching-playbook.md) — nenagresivna obrada velikog queue-a
+11. [Android app investigation](./docs/11-android-app-investigation.md) — zašto app prolazi a browser ne
+12. [Realtime notes](./docs/12-realtime-notes.md) — realtime end-to-end + replica identity full
 
 ## Ključna pravila (pročitaj prije koda)
 
