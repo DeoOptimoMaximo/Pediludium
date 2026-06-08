@@ -73,4 +73,19 @@ export interface TeamMatch {
   season_year: string | null;
 }
 
+export interface EventSide {
+  name: string | null;
+  alpha2: string | null;
+  score: number | null;
+}
+export interface EventDetail {
+  event_id: number;
+  start_ts: string | null;
+  competition: string | null;
+  round: string | null;
+  status_type: string | null;
+  home: EventSide;
+  away: EventSide;
+}
+
 export const BASELINE_MODEL = 'baseline-poisson-elo-v1';

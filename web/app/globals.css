@@ -155,3 +155,6 @@ table.tbl td.pts { font-weight: 800; }
 .stat { background: var(--bg-soft); border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px; text-align: center; }
 .stat b { font-size: 1.4rem; display: block; }
 .venue { font-size: .68rem; color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; }
+
+.hrow { cursor: pointer; border-radius: 8px; }
+.hrow:hover { background: var(--card-hi); }

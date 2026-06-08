@@ -96,7 +96,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
           </div>
           <div className="card" style={{ padding: '4px 14px' }}>
             {ms.map((h) => (
-              <div className="hrow" key={h.event_id}>
+              <Link className="hrow" key={h.event_id} href={`/event/${h.event_id}`}>
                 <span className="hdate">{fmtDay(h.start_ts)}</span>
                 <span className={`res ${h.result ?? ''}`}>{h.result}</span>
                 <span className="hopp">
@@ -110,7 +110,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                   </span>
                   <span className="hcomp">{h.tournament_name}</span>
                 </span>
-              </div>
+              </Link>
             ))}
           </div>
         </div>

@@ -110,3 +110,31 @@ export async function getTeamHistory(id: number): Promise<TeamMatch[]> {
   if (error) throw error;
   return (data ?? []) as TeamMatch[];
 }
+
+/** Detail for a single historical event (from team_match raw). Reconstructs home/away. */
+export async function getEventDetail(eventId: number): Promise<import('./types').EventDetail | null> {
+  const { data, error } = await supa()
+    .from('team_match')
+    .select(
+      'event_id, start_ts, is_home, team_score, opponent_score, opponent_name, opponent_alpha2, tournament_name, status_type, raw, team:team_id(name, country_alpha2)',
+    )
+    .eq('event_id', eventId)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const d = data as any;
+  const tracked = { name: d.team?.name ?? null, alpha2: d.team?.country_alpha2 ?? null, score: d.team_score };
+  const opp = { name: d.opponent_name ?? null, alpha2: d.opponent_alpha2 ?? null, score: d.opponent_score };
+  const raw = d.raw ?? {};
+  return {
+    event_id: d.event_id,
+    start_ts: d.start_ts,
+    competition: d.tournament_name ?? raw?.tournament?.name ?? null,
+    round: raw?.roundInfo?.name ?? (raw?.roundInfo?.round ? `Round ${raw.roundInfo.round}` : null),
+    status_type: d.status_type,
+    home: d.is_home ? tracked : opp,
+    away: d.is_home ? opp : tracked,
+  };
+}
