@@ -179,6 +179,23 @@ table.tbl td.pts { font-weight: 800; }
 .teamlink:hover { color: var(--accent); }
 .rank:hover .nm { color: var(--accent); }
 
+/* cross-group league ladder (group stage as one table) */
+table.tbl tr.tierhead td { padding: 0; border-bottom: none; }
+.tierhead .lbl { display: flex; align-items: center; gap: 8px; padding: 16px 8px 6px; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
+.tierhead .lbl .tag { margin-left: auto; font-size: .66rem; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); letter-spacing: .04em; }
+.tierhead.adv .lbl { color: var(--accent); }
+.tierhead.adv .tag { color: var(--accent); border-color: #2dd4a740; background: #2dd4a710; }
+.tierhead.out .lbl { color: var(--away); }
+.tierhead.out .tag { color: var(--away); border-color: #ef444440; background: #ef444410; }
+table.tbl tr.cutbar td { padding: 12px 8px; border-bottom: none; }
+.cutbar .bar { display: flex; align-items: center; gap: 12px; }
+.cutbar .ln { flex: 1; height: 2px; background: linear-gradient(90deg, transparent, var(--accent)); }
+.cutbar .ln.r { background: linear-gradient(90deg, var(--accent), transparent); }
+.cutbar .lbl2 { color: var(--accent); font-weight: 800; letter-spacing: .14em; font-size: .72rem; white-space: nowrap;
+  border: 1px solid #2dd4a740; border-radius: 999px; padding: 5px 16px; background: #2dd4a712; box-shadow: 0 0 18px #2dd4a722; }
+table.tbl tr.outrow td { opacity: .55; }
+table.tbl tr.qrow td.name { box-shadow: inset 3px 0 var(--accent); }
+
 /* PRESENT limiter — splits FUTURE (above) from PAST (below) on the team timeline */
 .nowline { display: flex; align-items: center; gap: 12px; margin: 26px 0 10px; }
 .nowline .ln { flex: 1; height: 2px; }
