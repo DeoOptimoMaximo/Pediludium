@@ -7,10 +7,15 @@ import { supa } from '@/lib/supabase';
  * Proves the realtime pipe end-to-end; when the fetcher upserts a live score,
  * Supabase Realtime pushes the change and this re-queries the live count.
  */
-export function LiveTicker() {
-  const [live, setLive] = useState<number | null>(null);
+/**
+ * In snapshot builds there is no Realtime — the server passes the live count from the
+ * published snapshot instead and the subscription is skipped.
+ */
+export function LiveTicker({ staticCount }: { staticCount?: number }) {
+  const [live, setLive] = useState<number | null>(staticCount ?? null);
 
   useEffect(() => {
+    if (process.env.NEXT_PUBLIC_DATA_SOURCE === 'snapshot') return;
     const client = supa();
     let active = true;
     const load = async () => {

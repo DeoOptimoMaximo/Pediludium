@@ -1,0 +1,26 @@
+// Public deployment of the web app (nogomet.domovina.ai) — Next.js on Workers via OpenNext.
+// The Worker reads ONLY the KV snapshot published by the home fetcher (npm run snapshot);
+// Supabase/Postgres stays local-dev-only.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "pediludium-web",
+  "account_id": "7dc7167b7e2e00923bfa7cd697df14e4", // D.O.M. (owns the domovina.ai zone)
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "SNAPSHOT",
+      "id": "7b0c159c53f14f868fd6504dae5d94ba"
+    }
+  ],
+  "routes": [{ "pattern": "nogomet.domovina.ai", "custom_domain": true }],
+  "vars": {
+    "NEXT_PUBLIC_DATA_SOURCE": "snapshot"
+  },
+  "observability": { "enabled": true }
+}

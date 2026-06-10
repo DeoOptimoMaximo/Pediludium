@@ -6,3 +6,8 @@ out/
 *.tsbuildinfo
 next-env.d.ts
 .DS_Store
+
+# OpenNext build output (Cloudflare deploy)
+.open-next/
+cloudflare-env.d.ts
+.wrangler/

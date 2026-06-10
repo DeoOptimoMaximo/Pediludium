@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getMatches, getPredictions, getRatings } from '@/lib/data';
+import { getMatches, getPredictions, getRatings, getSnapshotMeta, isSnapshot } from '@/lib/data';
 import { flag, fmtDay } from '@/lib/format';
 import { Countdown } from './components/Countdown';
 import { LiveTicker } from './components/LiveTicker';
@@ -9,10 +9,16 @@ import { RealtimeRefresh } from './components/RealtimeRefresh';
 export const dynamic = 'force-dynamic';
 
 export default async function OverviewPage() {
-  const [matches, preds, ratings] = await Promise.all([getMatches(), getPredictions(), getRatings()]);
+  const [matches, preds, ratings, snap] = await Promise.all([
+    getMatches(),
+    getPredictions(),
+    getRatings(),
+    getSnapshotMeta(),
+  ]);
   const upcoming = matches.filter((m) => m.status_type !== 'finished').slice(0, 7);
   const opener = matches[0];
   const top = ratings.slice(0, 10);
+  const liveCount = matches.filter((m) => m.status_type === 'inprogress').length;
 
   return (
     <>
@@ -22,12 +28,18 @@ export default async function OverviewPage() {
         <div className="kicker">FIFA World Cup 2026 · USA · Canada · Mexico</div>
         <h1>Pediludium</h1>
         <p className="muted" style={{ maxWidth: 560 }}>
-          Private realtime tracking & baseline analytics for the 48-team World Cup. Data mirrored
-          from SofaScore into our own database — the app reads only from us.
+          {isSnapshot
+            ? 'Open analytics for the 48-team World Cup: Dixon-Coles predictions and Monte-Carlo tournament odds, recomputed and republished on a fixed schedule.'
+            : 'Private realtime tracking & baseline analytics for the 48-team World Cup. Data mirrored from SofaScore into our own database — the app reads only from us.'}
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 10 }}>
-          <LiveTicker />
+          <LiveTicker staticCount={isSnapshot ? liveCount : undefined} />
           {opener?.start_ts && <span className="muted small">Kick-off {fmtDay(opener.start_ts)}</span>}
+          {snap && (
+            <span className="muted small">
+              Snapshot {new Date(snap.generated_at).toUTCString().slice(5, 22)} UTC
+            </span>
+          )}
         </div>
         {opener?.start_ts && <Countdown toIso={opener.start_ts} />}
         <div className="btnrow">

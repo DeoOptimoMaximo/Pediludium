@@ -8,3 +8,5 @@ dist/
 .secrets/
 *.log
 .DS_Store
+# generated snapshot artifacts (published to Cloudflare KV/R2, not committed)
+snapshot/

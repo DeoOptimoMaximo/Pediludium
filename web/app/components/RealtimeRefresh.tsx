@@ -20,6 +20,8 @@ export function RealtimeRefresh({
 }) {
   const router = useRouter();
   useEffect(() => {
+    // snapshot builds (public Cloudflare deploy) have no Supabase Realtime to subscribe to
+    if (process.env.NEXT_PUBLIC_DATA_SOURCE === 'snapshot') return;
     const client = supa();
     const ch = client
       .channel(channel ?? `rt-${table}-${filter ?? 'all'}`)
