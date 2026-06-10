@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Hourly public-snapshot pipeline for nogomet.domovina.ai.
+     Install: cp to ~/Library/LaunchAgents/ then
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.pediludium.snapshot.plist
+     Logs: ~/Library/Logs/pediludium/snapshot.log
+     Note: launchd skips ticks while the Mac sleeps (coalesced to one run on wake). -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.pediludium.snapshot</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/ms/git/DeoOptimoMaximo/Pediludium/fetcher/scripts/hourly-snapshot.sh</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Minute</key>
+    <integer>5</integer>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/ms/Library/Logs/pediludium/snapshot.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/ms/Library/Logs/pediludium/snapshot.log</string>
+</dict>
+</plist>
