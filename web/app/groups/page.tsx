@@ -142,7 +142,7 @@ export default async function GroupsPage() {
         )}
       </p>
 
-      <div className="grid cols-2">
+      <div className="autogrid">
         {[...groups.entries()].map(([name, rs]) => (
           <div className="card" key={name}>
             <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{groupLabel(name, lang)}</h2>

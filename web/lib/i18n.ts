@@ -11,6 +11,7 @@ export const LANGS: Lang[] = ['hr', 'en'];
 export interface Dict {
   locale: string;
   nav: { overview: string; fixtures: string; groups: string; teams: string; predictions: string; forecast: string; accuracy: string };
+  ui: { toDark: string; toLight: string; toWide: string; toBoxed: string };
   common: {
     live: string;
     finished: string;
@@ -131,6 +132,7 @@ export const T: Record<Lang, Dict> = {
   hr: {
     locale: 'hr-HR',
     nav: { overview: 'Pregled', fixtures: 'Raspored', groups: 'Skupine', teams: 'Momčadi', predictions: 'Predikcije', forecast: 'Prognoza', accuracy: 'Točnost' },
+    ui: { toDark: 'Tamna tema', toLight: 'Svijetla tema', toWide: 'Puna širina', toBoxed: 'Sužena širina' },
     common: {
       live: 'UŽIVO',
       finished: 'Završeno',
@@ -257,6 +259,7 @@ export const T: Record<Lang, Dict> = {
   en: {
     locale: 'en-GB',
     nav: { overview: 'Overview', fixtures: 'Fixtures', groups: 'Groups', teams: 'Teams', predictions: 'Predictions', forecast: 'Forecast', accuracy: 'Accuracy' },
+    ui: { toDark: 'Dark theme', toLight: 'Light theme', toWide: 'Full width', toBoxed: 'Boxed width' },
     common: {
       live: 'LIVE',
       finished: 'Finished',

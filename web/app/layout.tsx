@@ -1,6 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { getLang } from '@/lib/lang';
+import { getLang, getUiPrefs } from '@/lib/lang';
 import { Nav } from './components/Nav';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -15,11 +15,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const lang = await getLang();
+  const [lang, { theme, layout }] = await Promise.all([getLang(), getUiPrefs()]);
   return (
-    <html lang={lang}>
+    <html lang={lang} data-theme={theme} data-layout={layout}>
       <body>
-        <Nav lang={lang} />
+        <Nav lang={lang} theme={theme} layout={layout} />
         <main className="container">{children}</main>
       </body>
     </html>
