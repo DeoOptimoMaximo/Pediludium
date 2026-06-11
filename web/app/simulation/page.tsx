@@ -30,6 +30,7 @@ export default async function SimulationPage() {
       </p>
 
       <div className="card" style={{ padding: '6px 14px' }}>
+        <div className="tblwrap">
         <table className="tbl simtbl">
           <thead>
             <tr>
@@ -67,6 +68,7 @@ export default async function SimulationPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       <div className="note" style={{ marginTop: 18 }}>

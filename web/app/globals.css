@@ -82,6 +82,7 @@ h2 { font-size: 1.25rem; }
 .match:first-child { border-top: none; }
 .match .when { width: 58px; text-align: center; color: var(--muted); font-size: .8rem; flex-shrink: 0; }
 .match .teams { flex: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; min-width: 0; }
+.match .teams > div { min-width: 0; } /* let long team names ellipsize instead of widening the row */
 .match .teams .h { justify-content: flex-end; }
 .match .score { font-weight: 800; font-variant-numeric: tabular-nums; min-width: 42px; text-align: center; }
 .match .vs { color: var(--muted); font-size: .8rem; }
@@ -148,7 +149,8 @@ table.tbl td.pts { font-weight: 800; }
 /* team grid */
 .teamgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 @media (max-width: 820px) { .teamgrid { grid-template-columns: 1fr 1fr; } }
-.teamcard { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+.teamcard { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.teamcard .nm { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .teamcard:hover { border-color: var(--accent); }
 .teamcard .flag { font-size: 1.3rem; }
 .teamcard .rt { margin-left: auto; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
@@ -214,3 +216,56 @@ table.tbl tr.qrow td.name { box-shadow: inset 3px 0 var(--accent); }
 .urow:hover { background: var(--card-hi); }
 .urow .hdate { color: var(--muted); font-size: .78rem; }
 .urow .kick { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+
+/* wide tables scroll inside their card instead of widening the page */
+.tblwrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.tblwrap > table.tbl { min-width: 100%; }
+
+/* match-row prediction column (full row width on mobile, see below) */
+.predcol { width: 110px; flex-shrink: 0; }
+
+/* ===== mobile (phones) ===== */
+@media (max-width: 640px) {
+  .container { padding: 0 12px 48px; }
+
+  /* nav: one swipeable line — must never widen the page */
+  .nav-inner { gap: 16px; padding: 11px 12px; overflow-x: auto; scrollbar-width: none; }
+  .nav-inner::-webkit-scrollbar { display: none; }
+  .nav-inner a { flex-shrink: 0; }
+
+  .hero { padding: 24px 0 18px; }
+  .hero h1 { font-size: 1.9rem; }
+  .countdown { display: flex; width: 100%; gap: 8px; }
+  .cd-box { min-width: 0; flex: 1; padding: 8px 6px; }
+  .cd-box b { font-size: 1.25rem; }
+
+  /* match row: prediction bar drops to its own line, aligned under the teams */
+  .match { flex-wrap: wrap; row-gap: 7px; }
+  .match .when { width: 44px; font-size: .72rem; }
+  .match .score { min-width: 34px; }
+  .predcol { width: 100%; padding-left: 56px; }
+
+  /* tables: tighter cells (and .tblwrap takes over if they still overflow) */
+  table.tbl { font-size: .8rem; }
+  table.tbl th, table.tbl td { padding: 6px 5px; }
+  .simtbl td, .simtbl th { padding: 6px 5px; }
+  .simtbl th[style] { min-width: 90px !important; } /* relax the desktop bar-column widths */
+  .probval { min-width: 28px; font-size: .74rem; }
+  .probbar { min-width: 26px; }
+
+  /* team timeline rows */
+  .hrow, .urow { grid-template-columns: 56px 22px 1fr auto; gap: 7px; }
+  .hrow .hcomp { max-width: 76px; }
+
+  .statbar { gap: 8px; }
+  .stat { flex: 1; padding: 6px 8px; }
+  .stat b { font-size: 1.15rem; }
+  .big-pred { gap: 7px; }
+  .big-pred .cell { padding: 10px 6px; }
+  .big-pred .cell b { font-size: 1.35rem; }
+
+  .teamgrid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .teamcard { padding: 10px 12px; gap: 8px; }
+  .kvs { font-size: .84rem; }
+  h1 { font-size: 1.55rem; }
+}

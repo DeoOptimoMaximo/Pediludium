@@ -25,7 +25,7 @@ export function MatchRow({ m, p }: { m: WcMatch; p?: Prediction }) {
             <TeamInline name={m.away_name} short={m.away_short} alpha2={m.away_alpha2} />
           </div>
         </div>
-        <div style={{ width: 110, flexShrink: 0 }}>
+        <div className="predcol">
           <PredictionBar p={p} compact />
         </div>
       </div>

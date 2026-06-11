@@ -135,6 +135,7 @@ export default async function GroupsPage() {
         {[...groups.entries()].map(([name, rs]) => (
           <div className="card" key={name}>
             <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{name}</h2>
+            <div className="tblwrap">
             <table className="tbl">
               <thead>
                 <tr>
@@ -176,6 +177,7 @@ export default async function GroupsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         ))}
       </div>
@@ -189,6 +191,7 @@ export default async function GroupsPage() {
             <b>8 best third-placed</b> teams — <b>32 in total</b> — cross the line into the Round of 32; the bottom 4
             thirds and all 12 fourth-placed teams are out.
           </p>
+          <div className="tblwrap">
           <table className="tbl">
             <thead>
               <tr>
@@ -227,6 +230,7 @@ export default async function GroupsPage() {
               {fourths.map((r, i) => teamRow(r, i + 1, { out: true }))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </>
