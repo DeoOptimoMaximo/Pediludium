@@ -50,6 +50,7 @@ fi
 # DB-only compute (zero SofaScore calls) + publish to Cloudflare KV/R2
 step npm run predict:dc
 step npm run simulate
+step npm run history:record
 step npm run snapshot
 
 echo "[$(date -u +%FT%TZ)] ===== tick done ====="

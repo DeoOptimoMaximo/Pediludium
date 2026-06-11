@@ -87,7 +87,11 @@ export default async function GroupsPage() {
   const teamRow = (r: LeagueRow, rank: number, opts: { q?: boolean; out?: boolean } = {}) => (
     <tr
       key={`${r.pos}-${r.team_id}`}
-      className={[opts.q ? 'qrow' : '', opts.out ? 'outrow' : ''].join(' ').trim() || undefined}
+      className={
+        [opts.q ? 'qrow' : '', opts.out ? 'outrow' : '', r.alpha2 === 'HR' ? 'hl-cro' : '']
+          .join(' ')
+          .trim() || undefined
+      }
     >
       <td>{rank}</td>
       <td className="name">
@@ -160,7 +164,10 @@ export default async function GroupsPage() {
               </thead>
               <tbody>
                 {rs.map((r) => (
-                  <tr key={`${name}-${r.team_id}`}>
+                  <tr
+                    key={`${name}-${r.team_id}`}
+                    className={r.team?.country_alpha2 === 'HR' ? 'hl-cro' : undefined}
+                  >
                     <td>{r.position ?? '-'}</td>
                     <td className="name">
                       <Link href={`/team/${r.team_id}`} className="teamlink">

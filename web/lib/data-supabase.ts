@@ -136,6 +136,106 @@ export async function getTeamHistory(id: number): Promise<TeamMatch[]> {
   return (data ?? []) as TeamMatch[];
 }
 
+/* ── prediction time series (append-only history tables) ─────────────────── */
+
+const r4 = (v: number | null) => Math.round((v ?? 0) * 10000) / 10000;
+
+/** Collapse consecutive points whose probability vector didn't change. */
+function dedupe<T extends number[]>(pts: T[]): T[] {
+  const out: T[] = [];
+  for (const p of pts) {
+    const prev = out[out.length - 1];
+    if (prev && prev.every((v, i) => i === 0 || v === p[i])) continue;
+    out.push(p);
+  }
+  return out;
+}
+
+/** How p_home/p_draw/p_away evolved across snapshots for one match (per model). */
+export async function getMatchSeries(matchId: number): Promise<import('./types').MatchSeries | null> {
+  const { data, error } = await supa()
+    .from('prediction_history')
+    .select('model_version, captured_at, p_home, p_draw, p_away')
+    .eq('match_id', matchId)
+    .order('captured_at', { ascending: true });
+  if (error) throw error;
+  if (!data?.length) return null;
+  const out: import('./types').MatchSeries = {};
+  for (const r of data) {
+    (out[r.model_version] ??= []).push([
+      Math.floor(new Date(r.captured_at).getTime() / 1000),
+      r4(r.p_home), r4(r.p_draw), r4(r.p_away),
+    ]);
+  }
+  for (const m of Object.keys(out)) out[m] = dedupe(out[m]!);
+  return out;
+}
+
+/** How p_advance/p_win_cup evolved across snapshots for one team (per sim model). */
+export async function getTeamSeries(teamId: number): Promise<import('./types').TeamSeries | null> {
+  const { data, error } = await supa()
+    .from('simulation_history')
+    .select('model_version, captured_at, p_advance, p_win_cup, p_sf')
+    .eq('team_id', teamId)
+    .order('captured_at', { ascending: true });
+  if (error) throw error;
+  if (!data?.length) return null;
+  const out: import('./types').TeamSeries = {};
+  for (const r of data) {
+    (out[r.model_version] ??= []).push([
+      Math.floor(new Date(r.captured_at).getTime() / 1000),
+      r4(r.p_advance), r4(r.p_win_cup), r4(r.p_sf),
+    ]);
+  }
+  for (const m of Object.keys(out)) out[m] = dedupe(out[m]!);
+  return out;
+}
+
+/** Last pre-kickoff prediction of every finished match scored per model
+ * (multiclass Brier + log-loss) — computed here in dev; precomputed in snapshot mode. */
+export async function getCalibration(): Promise<import('./types').Calibration> {
+  const { data: finished, error: e1 } = await supa()
+    .from('wc2026_match')
+    .select('ss_id, start_ts, home_score, away_score')
+    .eq('status_type', 'finished')
+    .not('home_score', 'is', null);
+  if (e1) throw e1;
+  if (!finished?.length) return {};
+
+  const byId = new Map(finished.map((m) => [m.ss_id as number, m]));
+  const { data: hist, error: e2 } = await supa()
+    .from('prediction_history')
+    .select('match_id, model_version, captured_at, p_home, p_draw, p_away')
+    .in('match_id', [...byId.keys()])
+    .order('captured_at', { ascending: true });
+  if (e2) throw e2;
+
+  // last pre-kickoff row per (match, model)
+  const last = new Map<string, (typeof hist)[number]>();
+  for (const h of hist ?? []) {
+    const m = byId.get(h.match_id)!;
+    if (m.start_ts && h.captured_at <= m.start_ts) last.set(`${h.match_id}:${h.model_version}`, h);
+  }
+
+  const out: import('./types').Calibration = {};
+  for (const h of last.values()) {
+    const m = byId.get(h.match_id)!;
+    const p: [number, number, number] = [r4(h.p_home), r4(h.p_draw), r4(h.p_away)];
+    const outcome = m.home_score > m.away_score ? 0 : m.home_score < m.away_score ? 2 : 1;
+    const brier = p.reduce((s, pi, i) => s + (pi - (i === outcome ? 1 : 0)) ** 2, 0);
+    (out[h.model_version] ??= []).push({
+      match_id: h.match_id,
+      kickoff: m.start_ts,
+      p,
+      outcome,
+      brier: Math.round(brier * 10000) / 10000,
+      logloss: Math.round(-Math.log(Math.max(p[outcome], 1e-9)) * 10000) / 10000,
+    });
+  }
+  for (const rows of Object.values(out)) rows.sort((a, b) => a.kickoff.localeCompare(b.kickoff));
+  return out;
+}
+
 /** Detail for a single historical event (from team_match raw). Reconstructs home/away. */
 export async function getEventDetail(eventId: number): Promise<import('./types').EventDetail | null> {
   const { data, error } = await supa()

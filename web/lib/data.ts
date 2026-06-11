@@ -24,6 +24,9 @@ export const getTeamInfo = impl.getTeamInfo;
 export const getTeamUpcoming = impl.getTeamUpcoming;
 export const getTeamHistory = impl.getTeamHistory;
 export const getEventDetail = impl.getEventDetail;
+export const getMatchSeries = impl.getMatchSeries;
+export const getTeamSeries = impl.getTeamSeries;
+export const getCalibration = impl.getCalibration;
 
 /** Snapshot generation time, or null when reading live from Supabase. */
 export const getSnapshotMeta: () => Promise<{ generated_at: string } | null> = isSnapshot

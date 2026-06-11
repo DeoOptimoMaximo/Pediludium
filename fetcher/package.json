@@ -16,6 +16,8 @@
     "predict": "node src/predict.ts",
     "predict:dc": "node src/dixon-coles.ts",
     "simulate": "node src/simulate.ts",
+    "history:record": "node src/prediction-history.ts record",
+    "history:backfill": "node src/prediction-history.ts backfill",
     "export": "node src/export-snapshot.ts",
     "snapshot": "node src/export-snapshot.ts && node src/publish-snapshot.ts",
     "typecheck": "tsc --noEmit",

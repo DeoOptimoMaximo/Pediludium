@@ -1,24 +1,34 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getTeamHistory, getTeamInfo, getTeamUpcoming } from '@/lib/data';
+import { getTeamHistory, getTeamInfo, getTeamSeries, getTeamUpcoming } from '@/lib/data';
 import { flag, fmtDay, fmtTime } from '@/lib/format';
 import { groupLabel, resultLetter, teamName } from '@/lib/i18n';
 import { getDict } from '@/lib/lang';
-import type { TeamMatch } from '@/lib/types';
+import { SIM_MODEL, type TeamMatch } from '@/lib/types';
 import { RealtimeRefresh } from '../../components/RealtimeRefresh';
+import { SeriesChart } from '../../components/SeriesChart';
 
 export const dynamic = 'force-dynamic';
 
 export default async function TeamPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const teamId = Number(id);
-  const [{ lang, t }, team, history, upcoming] = await Promise.all([
+  const [{ lang, t }, team, history, upcoming, series] = await Promise.all([
     getDict(),
     getTeamInfo(teamId),
     getTeamHistory(teamId),
     getTeamUpcoming(teamId),
+    getTeamSeries(teamId),
   ]);
   if (!team) notFound();
+
+  const simPts = series?.[SIM_MODEL] ?? [];
+  // scale the odds chart to the team's advance probability, not the full 0–100%
+  const simYMax = Math.min(1, Math.max(0.05, ...simPts.map((p) => p[1])) * 1.15);
+  const span = (epoch: number) => {
+    const iso = new Date(epoch * 1000).toISOString();
+    return `${fmtDay(iso, lang)} ${fmtTime(iso)}`;
+  };
 
   const w = history.filter((h) => h.result === 'W').length;
   const d = history.filter((h) => h.result === 'D').length;
@@ -93,6 +103,24 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
           </p>
         )}
       </div>
+
+      {/* How the tournament forecast for this team moved across hourly snapshots */}
+      {simPts.length > 0 && (
+        <div className="card" style={{ marginTop: 14 }}>
+          <h2>{t.team.oddsTimeline}</h2>
+          <p className="small muted" style={{ marginTop: -2 }}>{t.team.oddsTimelineNote}</p>
+          <SeriesChart
+            lines={[
+              { label: t.simulation.th.advance, color: 'var(--home)', points: simPts.map((p) => [p[0], p[1]]) },
+              { label: t.simulation.th.semis, color: 'var(--draw)', points: simPts.map((p) => [p[0], p[3]]) },
+              { label: t.simulation.th.winCup, color: 'var(--accent)', points: simPts.map((p) => [p[0], p[2]]) },
+            ]}
+            yMax={simYMax}
+            xLabels={[span(simPts[0]![0]), span(simPts[simPts.length - 1]![0])]}
+            yLabel={`0–${Math.round(simYMax * 100)}%`}
+          />
+        </div>
+      )}
 
       {/* FUTURE — upcoming WC2026 fixtures (soonest first) */}
       {upcoming.length > 0 && (

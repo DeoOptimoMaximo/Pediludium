@@ -47,7 +47,7 @@ export default async function SimulationPage() {
           </thead>
           <tbody>
             {sims.map((s, i) => (
-              <tr key={s.team_id}>
+              <tr key={s.team_id} className={s.team?.country_alpha2 === 'HR' ? 'hl-cro' : undefined}>
                 <td className="muted">{i + 1}</td>
                 <td className="name">
                   <Link href={`/team/${s.team_id}`} className="teamlink">

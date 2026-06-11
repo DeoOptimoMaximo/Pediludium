@@ -1,13 +1,14 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getEventDetail, getMatch, getPrediction } from '@/lib/data';
+import { getEventDetail, getMatch, getMatchSeries, getPrediction } from '@/lib/data';
 import { flag, fmtDay, fmtTime, isLive, pct } from '@/lib/format';
 import { groupLabel, teamName, type Dict, type Lang } from '@/lib/i18n';
 import { getDict } from '@/lib/lang';
-import type { EventDetail, WcMatch } from '@/lib/types';
+import { PRED_MODELS, type EventDetail, type MatchSeries, type WcMatch } from '@/lib/types';
 import { TeamInline } from '../../components/TeamInline';
 import { BackButton } from '../../components/BackButton';
 import { RealtimeRefresh } from '../../components/RealtimeRefresh';
+import { SeriesChart } from '../../components/SeriesChart';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,10 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const { lang, t } = await getDict();
 
   const m = await getMatch(matchId);
-  if (m) return <WcMatchView m={m} matchId={matchId} p={await getPrediction(matchId)} lang={lang} t={t} />;
+  if (m) {
+    const [p, series] = await Promise.all([getPrediction(matchId), getMatchSeries(matchId)]);
+    return <WcMatchView m={m} matchId={matchId} p={p} series={series} lang={lang} t={t} />;
+  }
 
   const ev = await getEventDetail(matchId);
   if (ev) return <HistoricalEventView ev={ev} lang={lang} t={t} />;
@@ -37,12 +41,14 @@ async function WcMatchView({
   m,
   matchId,
   p,
+  series,
   lang,
   t,
 }: {
   m: WcMatch;
   matchId: number;
   p: Awaited<ReturnType<typeof getPrediction>>;
+  series: MatchSeries | null;
   lang: Lang;
   t: Dict;
 }) {
@@ -155,6 +161,8 @@ async function WcMatchView({
         </div>
       </div>
 
+      <PredictionTimeline series={series} kickoffIso={m.start_ts} lang={lang} t={t} />
+
       <div className="grid cols-3" style={{ marginTop: 14 }}>
         <div className="card">
           <h2>
@@ -178,6 +186,58 @@ async function WcMatchView({
         </div>
       </div>
     </>
+  );
+}
+
+/* ── How the prediction moved across hourly snapshots, per model ─────────── */
+function PredictionTimeline({
+  series,
+  kickoffIso,
+  lang,
+  t,
+}: {
+  series: MatchSeries | null;
+  kickoffIso: string | null;
+  lang: Lang;
+  t: Dict;
+}) {
+  if (!series) return null;
+  const models = [PRED_MODELS.dc, PRED_MODELS.baseline].filter((pm) => series[pm.version]?.length);
+  if (models.length === 0) return null;
+
+  const firstT = Math.min(...models.map((pm) => series[pm.version]![0]![0]));
+  const kick = kickoffIso ? Math.floor(new Date(kickoffIso).getTime() / 1000) : undefined;
+  const span = (iso: string | number) => {
+    const d = typeof iso === 'number' ? new Date(iso * 1000) : new Date(iso);
+    return `${fmtDay(d.toISOString(), lang)} ${fmtTime(d.toISOString())}`;
+  };
+
+  return (
+    <div className="card" style={{ marginTop: 14 }}>
+      <h2>{t.match.timeline}</h2>
+      <p className="small muted" style={{ marginTop: -2 }}>{t.match.timelineNote}</p>
+      <div className="grid cols-2">
+        {models.map((pm) => {
+          const pts = series[pm.version]!;
+          return (
+            <div key={pm.key}>
+              <h3 className="small muted" style={{ margin: '4px 0 6px' }}>{pm.label}</h3>
+              <SeriesChart
+                lines={[
+                  { label: t.common.home, color: 'var(--home)', points: pts.map((p) => [p[0], p[1]]) },
+                  { label: t.common.draw, color: 'var(--draw)', points: pts.map((p) => [p[0], p[2]]) },
+                  { label: t.common.away, color: 'var(--away)', points: pts.map((p) => [p[0], p[3]]) },
+                ]}
+                xMax={kick}
+                yMax={1}
+                xLabels={[span(firstT), kick ? span(kick) : '']}
+                yLabel="0–100%"
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

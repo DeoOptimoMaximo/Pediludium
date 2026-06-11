@@ -112,8 +112,28 @@ export async function getTeamHistory(id: number): Promise<TeamMatch[]> {
   return ((await kv().get(`hist:${id}`, 'json')) as TeamMatch[] | null) ?? [];
 }
 
-// must match EVENT_SHARDS in fetcher/src/export-snapshot.ts
+// must match EVENT_SHARDS / MSER_SHARDS in fetcher/src/export-snapshot.ts
 const EVENT_SHARDS = 64;
+const MSER_SHARDS = 16;
+
+/** How p_home/p_draw/p_away evolved across snapshots for one match (per model). */
+export async function getMatchSeries(matchId: number): Promise<import('./types').MatchSeries | null> {
+  const shard = (await kv().get(`mser:${matchId % MSER_SHARDS}`, 'json')) as Record<
+    string,
+    import('./types').MatchSeries
+  > | null;
+  return shard?.[String(matchId)] ?? null;
+}
+
+/** How p_advance/p_win_cup evolved across snapshots for one team (per sim model). */
+export async function getTeamSeries(teamId: number): Promise<import('./types').TeamSeries | null> {
+  return ((await kv().get(`tser:${teamId}`, 'json')) as import('./types').TeamSeries | null) ?? null;
+}
+
+/** Pre-kickoff predictions of finished matches scored per model (precomputed at export). */
+export async function getCalibration(): Promise<import('./types').Calibration> {
+  return ((await kv().get('calib', 'json')) as import('./types').Calibration | null) ?? {};
+}
 
 export async function getEventDetail(eventId: number): Promise<import('./types').EventDetail | null> {
   const shard = (await kv().get(`evs:${eventId % EVENT_SHARDS}`, 'json')) as Record<

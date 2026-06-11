@@ -22,6 +22,8 @@ import { WORLD_CUP } from './config.ts';
  */
 
 export const EVENT_SHARDS = 64;
+// time-series shards (mser:{match_id % MSER_SHARDS}) — mirror in web/lib/data-snapshot.ts
+export const MSER_SHARDS = 16;
 
 const OUT_DIR = path.resolve(import.meta.dirname, '..', 'snapshot');
 
@@ -183,11 +185,113 @@ async function exportEvents(): Promise<Record<string, unknown>> {
   return Object.fromEntries(rows.map((r) => [String(r.event_id), r.j]));
 }
 
+/* ── prediction/simulation time series (from the append-only history tables) ──
+ * Compact points: [epoch_seconds, ...probs rounded to 4dp]. Consecutive identical
+ * prob vectors are collapsed (hourly refits often barely move), so a series only
+ * grows when the model actually changed its mind. */
+
+type SeriesPt = number[];
+
+function dedupe(points: SeriesPt[]): SeriesPt[] {
+  const out: SeriesPt[] = [];
+  for (const p of points) {
+    const prev = out[out.length - 1];
+    if (prev && prev.length === p.length && prev.every((v, i) => i === 0 || v === p[i])) continue;
+    out.push(p);
+  }
+  return out;
+}
+
+/** match_id → model_version → [[t, p_home, p_draw, p_away], …] sharded for KV. */
+async function exportMatchSeries(): Promise<Record<number, Record<string, Record<string, SeriesPt[]>>>> {
+  const rows = await dbQuery<{ match_id: number; model_version: string; pts: SeriesPt[] }>(
+    `select match_id, model_version,
+            json_agg(json_build_array(
+              floor(extract(epoch from captured_at)),
+              round(p_home::numeric, 4), round(p_draw::numeric, 4), round(p_away::numeric, 4)
+            ) order by captured_at) as pts
+       from public.prediction_history
+      group by match_id, model_version`,
+  );
+  const shards: Record<number, Record<string, Record<string, SeriesPt[]>>> = {};
+  for (let s = 0; s < MSER_SHARDS; s++) shards[s] = {};
+  for (const r of rows) {
+    const shard = shards[r.match_id % MSER_SHARDS]!;
+    ((shard[String(r.match_id)] ??= {}) as Record<string, SeriesPt[]>)[r.model_version] = dedupe(r.pts);
+  }
+  return shards;
+}
+
+/** team_id → model_version → [[t, p_advance, p_win_cup, p_sf], …]. */
+async function exportTeamSeries(): Promise<Record<string, Record<string, SeriesPt[]>>> {
+  const rows = await dbQuery<{ team_id: number; model_version: string; pts: SeriesPt[] }>(
+    `select team_id, model_version,
+            json_agg(json_build_array(
+              floor(extract(epoch from captured_at)),
+              round(p_advance::numeric, 4), round(p_win_cup::numeric, 4), round(p_sf::numeric, 4)
+            ) order by captured_at) as pts
+       from public.simulation_history
+      group by team_id, model_version`,
+  );
+  const out: Record<string, Record<string, SeriesPt[]>> = {};
+  for (const r of rows) {
+    (out[String(r.team_id)] ??= {})[r.model_version] = dedupe(r.pts);
+  }
+  return out;
+}
+
+/** Per finished match & model: the last pre-kickoff prediction scored against the
+ * actual result (multiclass Brier + log-loss). The web only aggregates/renders. */
+async function exportCalibration(): Promise<Record<string, unknown[]>> {
+  const rows = await dbQuery<{
+    model_version: string;
+    match_id: number;
+    start_ts: string;
+    home_score: number;
+    away_score: number;
+    p_home: number | null;
+    p_draw: number | null;
+    p_away: number | null;
+  }>(
+    `select distinct on (h.match_id, h.model_version)
+            h.model_version, h.match_id, m.start_ts, m.home_score, m.away_score,
+            h.p_home, h.p_draw, h.p_away
+       from public.prediction_history h
+       join public.match m on m.ss_id = h.match_id
+      where m.status_type = 'finished'
+        and m.home_score is not null and m.away_score is not null
+        and h.captured_at <= m.start_ts
+      order by h.match_id, h.model_version, h.captured_at desc`,
+  );
+  const out: Record<string, unknown[]> = {};
+  for (const r of rows) {
+    const p = [r.p_home ?? 0, r.p_draw ?? 0, r.p_away ?? 0];
+    const outcome = r.home_score > r.away_score ? 0 : r.home_score < r.away_score ? 2 : 1;
+    const brier = p.reduce((s, pi, i) => s + (pi - (i === outcome ? 1 : 0)) ** 2, 0);
+    const logloss = -Math.log(Math.max(p[outcome]!, 1e-9));
+    (out[r.model_version] ??= []).push({
+      match_id: r.match_id,
+      kickoff: r.start_ts,
+      p: p.map((v) => Math.round(v * 10000) / 10000),
+      outcome,
+      brier: Math.round(brier * 10000) / 10000,
+      logloss: Math.round(logloss * 10000) / 10000,
+    });
+  }
+  for (const rowsOf of Object.values(out)) {
+    (rowsOf as { kickoff: string }[]).sort((a, b) => a.kickoff.localeCompare(b.kickoff));
+  }
+  return out;
+}
+
 async function main(): Promise<void> {
   const generatedAt = new Date().toISOString();
   const core = await exportCore(generatedAt);
   const histories = await exportHistories();
   const events = await exportEvents();
+  const matchSeries = await exportMatchSeries();
+  const teamSeries = await exportTeamSeries();
+  const calibration = await exportCalibration();
 
   const shards: Record<number, Record<string, unknown>> = {};
   for (const [id, j] of Object.entries(events)) {
@@ -199,6 +303,9 @@ async function main(): Promise<void> {
     { key: 'core', value: JSON.stringify(core) },
     ...Object.entries(histories).map(([id, j]) => ({ key: `hist:${id}`, value: JSON.stringify(j) })),
     ...Object.entries(shards).map(([s, j]) => ({ key: `evs:${s}`, value: JSON.stringify(j) })),
+    ...Object.entries(matchSeries).map(([s, j]) => ({ key: `mser:${s}`, value: JSON.stringify(j) })),
+    ...Object.entries(teamSeries).map(([id, j]) => ({ key: `tser:${id}`, value: JSON.stringify(j) })),
+    { key: 'calib', value: JSON.stringify(calibration) },
   ];
 
   await mkdir(OUT_DIR, { recursive: true });

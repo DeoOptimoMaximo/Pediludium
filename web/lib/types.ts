@@ -104,6 +104,30 @@ export interface TournamentSim {
   team: { name: string | null; short_name: string | null; country_alpha2: string | null } | null;
 }
 
+/* ── prediction time series (from the hourly snapshot history) ─────────────
+ * Compact points: [epoch_seconds, ...probabilities]. Consecutive identical
+ * vectors are collapsed at export time, so a flat line = the model held its view. */
+
+/** [t, p_home, p_draw, p_away] */
+export type MatchSeriesPoint = [number, number, number, number];
+/** [t, p_advance, p_win_cup, p_sf] */
+export type TeamSeriesPoint = [number, number, number, number];
+/** model_version → chronological points */
+export type MatchSeries = Record<string, MatchSeriesPoint[]>;
+export type TeamSeries = Record<string, TeamSeriesPoint[]>;
+
+/** One finished match scored against the last pre-kickoff prediction. */
+export interface CalibRow {
+  match_id: number;
+  kickoff: string;
+  p: [number, number, number]; // home / draw / away
+  outcome: 0 | 1 | 2; // index into p
+  brier: number; // multiclass, 0 best … 2 worst (uniform guess: 0.667)
+  logloss: number; // uniform guess: 1.0986
+}
+/** model_version → rows ordered by kickoff */
+export type Calibration = Record<string, CalibRow[]>;
+
 // model_version identifiers used across the app (the schema versions predictions/sims)
 export const BASELINE_MODEL = 'baseline-poisson-elo-v1';
 export const DC_MODEL = 'dixon-coles-v1';

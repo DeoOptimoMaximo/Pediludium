@@ -20,6 +20,12 @@ fetcher ──> Postgres (56322) ──> npm run snapshot ──KV──> Worker
   - `evs:{shard}` — precomputed EventDetail, shardano po `event_id % 64` (64 ključa — NE per-event,
     KV write košta $5/M; vidi `EVENT_SHARDS` u `fetcher/src/export-snapshot.ts` — mora biti
     sinkroniziran s `web/lib/data-snapshot.ts`)
+  - `mser:{shard}` — vremenske serije predikcija po utakmici (oba modela), shardano po
+    `match_id % 16` (`MSER_SHARDS`, isto sinkronizirano s webom). Točke `[t, pH, pX, pA]`
+    (epoch sekunde, 4 decimale), uzastopno identične vrijednosti kolabirane.
+  - `tser:{teamId}` — serije simulacije po timu: `[t, p_advance, p_win_cup, p_sf]` (48 ključeva)
+  - `calib` — predizračunata kalibracija: za svaku završenu utakmicu zadnja predikcija
+    prije početka + ishod + Brier + log-loss, po modelu (web `/accuracy` samo agregira)
 - **R2 bucket `pediludium-snapshots`:** svaki publish arhivira **puni** `snapshot.json` pod
   `snapshots/{generated_at s ':'→'-'}.json`. Format: `{ core, histories, events }` gdje `core`
   sadrži `generated_at`, `matches` (sa scoreovima!), `predictions` (po model_version),
@@ -41,9 +47,26 @@ fetcher ──> Postgres (56322) ──> npm run snapshot ──KV──> Worker
 
 | Kada | Što |
 |---|---|
-| svaki sat | `refresh --full` (rezultati+raspored, headless Chrome `SOFA_HEADLESS=1` — dokazano prolazi) → `predict:dc` → `simulate` → `snapshot` |
+| svaki sat | `refresh --full` (rezultati+raspored, headless Chrome `SOFA_HEADLESS=1` — dokazano prolazi) → `predict:dc` → `simulate` → `history:record` → `snapshot` |
 | 02/08/14/20 h | + `backfill` (standings + group tagging) |
 | 04 h | + `history` & baseline `predict` (noćni bulk, delay 2500–6000 ms po docs/10) |
+
+## Vremenska serija predikcija (kronologija + kalibracija)
+
+`prediction` i `tournament_simulation` su "latest" tablice (upsert pregazi staro), pa kronologija
+živi u **append-only** tablicama `prediction_history` i `simulation_history`
+(migracija `20260611130000`). Pune se na dva načina (`fetcher/src/prediction-history.ts`):
+
+- **`npm run history:record`** — svaki satni tick (nakon predict/simulate) kopira aktualne
+  retke s `captured_at = now()`. Predikcije se snimaju SAMO za utakmice `status_type='notstarted'`
+  — serija je "kako se prognoza kretala do sudačkog zvižduka".
+- **`npm run history:backfill [ključevi…]`** — jednokratni catch-up iz R2 arhiva
+  (ključevi iz launchd loga ili argumenata; `wrangler r2 object get` po snapshotu,
+  `captured_at = generated_at`). Idempotentno — unique `(id, model_version, captured_at)`.
+
+Web prikazi: graf kronologije na `/match/[id]` (DC vs baseline), graf izgleda na
+`/team/[id]` (p_advance/p_sf/p_win_cup), te **`/accuracy`** — Brier/log-loss po modelu
+(zamrznuto prije početka, ocijenjeno nakon rezultata; usporedba s nasumičnim 0.667/1.099).
 
 Log: `~/Library/Logs/pediludium/snapshot.log`. mkdir-lock protiv preklapanja; failani step se
 logira i chain nastavlja (objavi se staro-ali-konzistentno). Upravljanje:

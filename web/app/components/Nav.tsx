@@ -15,6 +15,7 @@ export function Nav({ lang }: { lang: Lang }) {
     ['/teams', t.teams],
     ['/predictions', t.predictions],
     ['/simulation', t.forecast],
+    ['/accuracy', t.accuracy],
   ] as const;
 
   const setLang = (l: Lang) => {

@@ -14,7 +14,11 @@ export default async function TeamsPage() {
       <p className="muted">{t.teams.sub(teams.length)}</p>
       <div className="teamgrid">
         {teams.map((tm) => (
-          <Link key={tm.ss_id} href={`/team/${tm.ss_id}`} className="teamcard">
+          <Link
+            key={tm.ss_id}
+            href={`/team/${tm.ss_id}`}
+            className={`teamcard${tm.country_alpha2 === 'HR' ? ' hl-cro' : ''}`}
+          >
             <span className="flag">{flag(tm.country_alpha2)}</span>
             <span className="nm">{teamName(tm.name, tm.country_alpha2, lang) ?? tm.short_name ?? tm.ss_id}</span>
             {tm.rating != null && <span className="rt">{tm.rating}</span>}

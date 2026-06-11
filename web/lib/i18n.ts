@@ -10,7 +10,7 @@ export const LANGS: Lang[] = ['hr', 'en'];
 
 export interface Dict {
   locale: string;
-  nav: { overview: string; fixtures: string; groups: string; teams: string; predictions: string; forecast: string };
+  nav: { overview: string; fixtures: string; groups: string; teams: string; predictions: string; forecast: string; accuracy: string };
   common: {
     live: string;
     finished: string;
@@ -42,6 +42,10 @@ export interface Dict {
     powerRanking: string;
     powerRankingSub: string;
     note: string;
+    croTitle: string;
+    croSub: string;
+    croNext: string;
+    croProfile: string;
   };
   fixtures: { title: string; sub: (n: number) => string };
   groups: {
@@ -70,6 +74,8 @@ export interface Dict {
     historyLoading: string;
     upcoming: string;
     present: string;
+    oddsTimeline: string;
+    oddsTimelineNote: string;
   };
   predictions: {
     title: string;
@@ -104,13 +110,27 @@ export interface Dict {
     result: string;
     histStatsTitle: string;
     histStatsSoon: string;
+    timeline: string;
+    timelineNote: string;
+  };
+  accuracy: {
+    title: string;
+    sub: string;
+    empty: string;
+    explainer: string;
+    summary: { model: string; matches: string; brier: string; logloss: string; naive: string };
+    perMatch: string;
+    chartTitle: string;
+    chartNote: string;
+    th: { date: string; match: string; pred: string; outcome: string; brier: string; logloss: string };
+    outcomeName: (o: 0 | 1 | 2) => string;
   };
 }
 
 export const T: Record<Lang, Dict> = {
   hr: {
     locale: 'hr-HR',
-    nav: { overview: 'Pregled', fixtures: 'Raspored', groups: 'Skupine', teams: 'Momčadi', predictions: 'Predikcije', forecast: 'Prognoza' },
+    nav: { overview: 'Pregled', fixtures: 'Raspored', groups: 'Skupine', teams: 'Momčadi', predictions: 'Predikcije', forecast: 'Prognoza', accuracy: 'Točnost' },
     common: {
       live: 'UŽIVO',
       finished: 'Završeno',
@@ -143,6 +163,10 @@ export const T: Record<Lang, Dict> = {
       powerRanking: 'Ljestvica snage · Elo',
       powerRankingSub: 'Rejting forme iz povijesti utakmica (osnovni model).',
       note: 'Predikcije su transparentni statistički modeli: Elo + Poisson osnova i Dixon-Coles nadogradnja, a izgledi prolaska i naslova dolaze iz Monte-Carlo simulacije cijelog turnira.',
+      croTitle: 'Hrvatska',
+      croSub: 'Naša reprezentacija na Svjetskom prvenstvu',
+      croNext: 'Sljedeća utakmica',
+      croProfile: 'Profil i kronologija izgleda →',
     },
     fixtures: { title: 'Raspored', sub: (n) => `${n} utakmica · sva vremena po Zagrebu` },
     groups: {
@@ -172,6 +196,9 @@ export const T: Record<Lang, Dict> = {
       historyLoading: 'Povijest utakmica još se učitava.',
       upcoming: 'Slijedi',
       present: 'SADA',
+      oddsTimeline: 'Izgledi kroz vrijeme',
+      oddsTimelineNote:
+        'Kako se Monte-Carlo prognoza turnira mijenja iz sata u sat kako stižu novi rezultati i model se ponovno trenira. Ravna linija = prognoza se nije mijenjala.',
     },
     predictions: {
       title: 'Predikcije',
@@ -208,11 +235,28 @@ export const T: Record<Lang, Dict> = {
       result: 'Rezultat',
       histStatsTitle: 'Statistika / postave / događaji',
       histStatsSoon: 'Za povijesne utakmice još nije uvezeno — stiže naknadno.',
+      timeline: 'Kronologija predikcije',
+      timelineNote:
+        'Satni izračuni od prvog snapshota do početka utakmice. Stepenasta linija drži vrijednost dok je model ne promijeni — ravno znači da model nije mijenjao mišljenje.',
+    },
+    accuracy: {
+      title: 'Točnost modela',
+      sub: 'Svaka predikcija zamrzava se prije početka utakmice, a nakon rezultata ocjenjuje — jesu li modeli istiniti ili je jednostavno: lopta je okrugla?',
+      empty:
+        'Još nema završenih utakmica za ocjenjivanje. Čim padnu prvi rezultati, ovdje kreće usporedba modela: Brier i log-loss po utakmici i kroz vrijeme.',
+      explainer:
+        'Brier (0 najbolje, 2 najgore): zbroj kvadrata razlika između predikcije i ishoda; nasumično pogađanje (⅓-⅓-⅓) daje 0,667. Log-loss kažnjava samouvjerene promašaje; nasumično = 1,099. Niže je bolje kod oba.',
+      summary: { model: 'Model', matches: 'Utakmice', brier: 'Brier (prosjek)', logloss: 'Log-loss (prosjek)', naive: 'nasumično' },
+      perMatch: 'Po utakmici',
+      chartTitle: 'Brier kroz vrijeme (kumulativni prosjek)',
+      chartNote: 'Svaka točka = stanje nakon ocjene još jedne utakmice. Ispod sive linije (0,667) model je bolji od nasumičnog pogađanja.',
+      th: { date: 'Datum', match: 'Utakmica', pred: 'Predikcija 1-X-2', outcome: 'Ishod', brier: 'Brier', logloss: 'Log-loss' },
+      outcomeName: (o) => (o === 0 ? '1 (domaćin)' : o === 1 ? 'X (neriješeno)' : '2 (gost)'),
     },
   },
   en: {
     locale: 'en-GB',
-    nav: { overview: 'Overview', fixtures: 'Fixtures', groups: 'Groups', teams: 'Teams', predictions: 'Predictions', forecast: 'Forecast' },
+    nav: { overview: 'Overview', fixtures: 'Fixtures', groups: 'Groups', teams: 'Teams', predictions: 'Predictions', forecast: 'Forecast', accuracy: 'Accuracy' },
     common: {
       live: 'LIVE',
       finished: 'Finished',
@@ -245,6 +289,10 @@ export const T: Record<Lang, Dict> = {
       powerRanking: 'Power ranking · Elo',
       powerRankingSub: 'Recent-form rating from match history (baseline).',
       note: 'Predictions are transparent statistical models: an Elo + Poisson baseline and a Dixon-Coles upgrade, with advance & title odds from a Monte-Carlo simulation of the whole tournament.',
+      croTitle: 'Croatia',
+      croSub: 'Our national team at the World Cup',
+      croNext: 'Next match',
+      croProfile: 'Profile & odds timeline →',
     },
     fixtures: { title: 'Fixtures', sub: (n) => `${n} matches · all times Europe/Zagreb` },
     groups: {
@@ -274,6 +322,9 @@ export const T: Record<Lang, Dict> = {
       historyLoading: 'Match history is still loading.',
       upcoming: 'Upcoming',
       present: 'PRESENT',
+      oddsTimeline: 'Odds over time',
+      oddsTimelineNote:
+        'How the Monte-Carlo tournament forecast moves hour by hour as new results arrive and the model refits. A flat line means the forecast held steady.',
     },
     predictions: {
       title: 'Predictions',
@@ -310,6 +361,23 @@ export const T: Record<Lang, Dict> = {
       result: 'Result',
       histStatsTitle: 'Stats / lineups / incidents',
       histStatsSoon: 'Not yet ingested for historical matches — coming later.',
+      timeline: 'Prediction timeline',
+      timelineNote:
+        'Hourly recomputes from the first snapshot until kick-off. The step line holds a value until the model changes its mind — flat means it never did.',
+    },
+    accuracy: {
+      title: 'Model accuracy',
+      sub: 'Every prediction is frozen before kick-off and scored once the result is in — are the models truthful, or is it simply: the ball is round?',
+      empty:
+        'No finished matches to score yet. As soon as the first results land, the model comparison starts here: Brier and log-loss per match and over time.',
+      explainer:
+        'Brier (0 best, 2 worst): sum of squared differences between prediction and outcome; random guessing (⅓-⅓-⅓) scores 0.667. Log-loss punishes confident misses; random = 1.099. Lower is better for both.',
+      summary: { model: 'Model', matches: 'Matches', brier: 'Brier (mean)', logloss: 'Log-loss (mean)', naive: 'random' },
+      perMatch: 'Per match',
+      chartTitle: 'Brier over time (cumulative mean)',
+      chartNote: 'Each point = the running average after scoring one more match. Below the grey line (0.667) the model beats random guessing.',
+      th: { date: 'Date', match: 'Match', pred: 'Prediction 1-X-2', outcome: 'Outcome', brier: 'Brier', logloss: 'Log-loss' },
+      outcomeName: (o) => (o === 0 ? '1 (home)' : o === 1 ? 'X (draw)' : '2 (away)'),
     },
   },
 };
