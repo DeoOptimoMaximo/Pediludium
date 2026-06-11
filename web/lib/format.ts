@@ -1,18 +1,41 @@
-const TZ = 'Europe/Zagreb';
+import type { Lang } from './i18n';
 
-/** alpha2 → flag emoji; returns '' for non-ISO codes (e.g. EN, SX) so UI can fall back. */
+const TZ = 'Europe/Zagreb';
+const LOCALE: Record<Lang, string> = { hr: 'hr-HR', en: 'en-GB' };
+
+/**
+ * alpha2 → flag emoji. England/Scotland/Wales are not ISO regions — they render via
+ * Unicode subdivision tag sequences (🏴 + gb{eng,sct,wls} tags) instead of the
+ * regional-indicator pair.
+ */
+const SUBDIVISION_FLAGS: Record<string, string> = {
+  EN: subdivisionFlag('gbeng'), // England
+  SX: subdivisionFlag('gbsct'), // Scotland (source uses SX)
+  WA: subdivisionFlag('gbwls'), // Wales
+};
+
+function subdivisionFlag(code: string): string {
+  const TAG_BASE = 0xe0000;
+  const CANCEL = String.fromCodePoint(0xe007f);
+  return (
+    '\u{1F3F4}' +
+    [...code].map((ch) => String.fromCodePoint(TAG_BASE + ch.charCodeAt(0))).join('') +
+    CANCEL
+  );
+}
+
 export function flag(alpha2: string | null | undefined): string {
   if (!alpha2 || alpha2.length !== 2 || !/^[A-Za-z]{2}$/.test(alpha2)) return '';
   const cc = alpha2.toUpperCase();
-  // a few SofaScore codes are not ISO regions and won't render a flag — skip them
-  if (['EN', 'SX', 'XK'].includes(cc)) return '';
+  if (SUBDIVISION_FLAGS[cc]) return SUBDIVISION_FLAGS[cc];
+  if (cc === 'XK') return ''; // Kosovo has no emoji flag yet
   const A = 0x1f1e6;
   return String.fromCodePoint(A + (cc.charCodeAt(0) - 65), A + (cc.charCodeAt(1) - 65));
 }
 
-export function fmtDay(iso: string | null): string {
+export function fmtDay(iso: string | null, lang: Lang = 'en'): string {
   if (!iso) return 'TBD';
-  return new Intl.DateTimeFormat('en-GB', {
+  return new Intl.DateTimeFormat(LOCALE[lang], {
     weekday: 'short',
     day: '2-digit',
     month: 'short',
@@ -41,10 +64,6 @@ export function dayKey(iso: string | null): string {
 
 export function pct(n: number | null | undefined): number {
   return Math.round((n ?? 0) * 100);
-}
-
-export function teamLogo(teamId: number | null | undefined): string {
-  return teamId ? `https://api.sofascore.com/api/v1/team/${teamId}/image` : '';
 }
 
 export function isLive(statusType: string | null): boolean {

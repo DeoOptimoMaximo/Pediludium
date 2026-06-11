@@ -1,18 +1,16 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supa } from '@/lib/supabase';
+import { T, type Lang } from '@/lib/i18n';
 
 /**
- * Realtime "live now" pill — subscribes to Postgres changes on `match`.
- * Proves the realtime pipe end-to-end; when the fetcher upserts a live score,
- * Supabase Realtime pushes the change and this re-queries the live count.
+ * "Live now" pill. In snapshot builds (public deploy) there is no Realtime — the server
+ * passes the live count from the published snapshot and the subscription is skipped;
+ * in dev it subscribes to Postgres changes on `match` and re-queries the live count.
  */
-/**
- * In snapshot builds there is no Realtime — the server passes the live count from the
- * published snapshot instead and the subscription is skipped.
- */
-export function LiveTicker({ staticCount }: { staticCount?: number }) {
+export function LiveTicker({ lang, staticCount }: { lang: Lang; staticCount?: number }) {
   const [live, setLive] = useState<number | null>(staticCount ?? null);
+  const t = T[lang].ticker;
 
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_DATA_SOURCE === 'snapshot') return;
@@ -36,7 +34,7 @@ export function LiveTicker({ staticCount }: { staticCount?: number }) {
     };
   }, []);
 
-  if (live === null) return <span className="chip">connecting…</span>;
-  if (live === 0) return <span className="chip">no matches live</span>;
-  return <span className="chip live">● {live} live now</span>;
+  if (live === null) return <span className="chip">{t.connecting}</span>;
+  if (live === 0) return <span className="chip">{t.none}</span>;
+  return <span className="chip live">{t.live(live)}</span>;
 }

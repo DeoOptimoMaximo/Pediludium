@@ -1,21 +1,23 @@
 import Link from 'next/link';
 import { getNationalTeams } from '@/lib/data';
 import { flag } from '@/lib/format';
+import { teamName } from '@/lib/i18n';
+import { getDict } from '@/lib/lang';
 
 export const dynamic = 'force-dynamic';
 
 export default async function TeamsPage() {
-  const teams = await getNationalTeams();
+  const [{ lang, t }, teams] = await Promise.all([getDict(), getNationalTeams()]);
   return (
     <>
-      <h1 style={{ marginTop: 28 }}>Teams</h1>
-      <p className="muted">{teams.length} national teams · Elo rated · click for 10-year history</p>
+      <h1 style={{ marginTop: 28 }}>{t.teams.title}</h1>
+      <p className="muted">{t.teams.sub(teams.length)}</p>
       <div className="teamgrid">
-        {teams.map((t) => (
-          <Link key={t.ss_id} href={`/team/${t.ss_id}`} className="teamcard">
-            <span className="flag">{flag(t.country_alpha2)}</span>
-            <span className="nm">{t.name ?? t.short_name ?? t.ss_id}</span>
-            {t.rating != null && <span className="rt">{t.rating}</span>}
+        {teams.map((tm) => (
+          <Link key={tm.ss_id} href={`/team/${tm.ss_id}`} className="teamcard">
+            <span className="flag">{flag(tm.country_alpha2)}</span>
+            <span className="nm">{teamName(tm.name, tm.country_alpha2, lang) ?? tm.short_name ?? tm.ss_id}</span>
+            {tm.rating != null && <span className="rt">{tm.rating}</span>}
           </Link>
         ))}
       </div>

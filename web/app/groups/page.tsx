@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { getRatings, getSimulations, getStandings } from '@/lib/data';
 import { flag, pct } from '@/lib/format';
+import { groupLabel, teamName } from '@/lib/i18n';
+import { getDict } from '@/lib/lang';
 import type { StandingRow } from '@/lib/types';
 import { RealtimeRefresh } from '../components/RealtimeRefresh';
 
@@ -21,14 +23,19 @@ type LeagueRow = {
 };
 
 export default async function GroupsPage() {
-  const [rows, sims, ratings] = await Promise.all([getStandings(), getSimulations(), getRatings()]);
+  const [{ lang, t }, rows, sims, ratings] = await Promise.all([
+    getDict(),
+    getStandings(),
+    getSimulations(),
+    getRatings(),
+  ]);
   const advOf = new Map<number, number>();
   for (const s of sims) advOf.set(s.team_id, s.p_advance ?? 0);
   const eloOf = new Map<number, number>();
   for (const r of ratings) eloOf.set(r.team_id, r.rating);
   const hasSim = sims.length > 0;
 
-  // Group cards: real groups A–L only. SofaScore ships a 13th "Third-placed
+  // Group cards: real groups A–L only. The upstream feed ships a 13th "Third-placed
   // teams" meta-table — we drop it here and recompute the cross-group third
   // ranking ourselves in the league ladder below.
   const groups = new Map<string, StandingRow[]>();
@@ -52,7 +59,7 @@ export default async function GroupsPage() {
       const ga = r.goals_against ?? 0;
       league.push({
         team_id: r.team_id,
-        name: r.team?.name ?? r.team?.short_name ?? String(r.team_id),
+        name: teamName(r.team?.name ?? null, r.team?.country_alpha2, lang) ?? r.team?.short_name ?? String(r.team_id),
         alpha2: r.team?.country_alpha2 ?? null,
         grp: letter,
         pos: r.position ?? 4,
@@ -119,14 +126,14 @@ export default async function GroupsPage() {
   return (
     <>
       <RealtimeRefresh table="standing" />
-      <h1 style={{ marginTop: 28 }}>Groups & standings</h1>
+      <h1 style={{ marginTop: 28 }}>{t.groups.title}</h1>
       <p className="muted">
-        12 groups of 4. Tables update live once matches kick off (all zeros pre-tournament).
+        {t.groups.intro}
         {hasSim && (
           <>
             {' '}
-            <b>Adv</b> = chance of reaching the Round of 32 from the{' '}
-            <Link href="/simulation" className="teamlink">forecast</Link>.
+            <b>{t.groups.th.adv}</b> {t.groups.advExplainer[1]}{' '}
+            <Link href="/simulation" className="teamlink">{t.groups.advExplainer[2]}</Link>.
           </>
         )}
       </p>
@@ -134,21 +141,21 @@ export default async function GroupsPage() {
       <div className="grid cols-2">
         {[...groups.entries()].map(([name, rs]) => (
           <div className="card" key={name}>
-            <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{name}</h2>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{groupLabel(name, lang)}</h2>
             <div className="tblwrap">
             <table className="tbl">
               <thead>
                 <tr>
                   <th>#</th>
-                  <th style={{ textAlign: 'left' }}>Team</th>
-                  <th>P</th>
-                  <th>W</th>
-                  <th>D</th>
-                  <th>L</th>
-                  <th>GF</th>
-                  <th>GA</th>
-                  <th>Pts</th>
-                  {hasSim && <th>Adv</th>}
+                  <th style={{ textAlign: 'left' }}>{t.groups.th.team}</th>
+                  <th>{t.groups.th.p}</th>
+                  <th>{t.groups.th.w}</th>
+                  <th>{t.groups.th.d}</th>
+                  <th>{t.groups.th.l}</th>
+                  <th>{t.groups.th.gf}</th>
+                  <th>{t.groups.th.ga}</th>
+                  <th>{t.groups.th.pts}</th>
+                  {hasSim && <th>{t.groups.th.adv}</th>}
                 </tr>
               </thead>
               <tbody>
@@ -158,7 +165,7 @@ export default async function GroupsPage() {
                     <td className="name">
                       <Link href={`/team/${r.team_id}`} className="teamlink">
                         <span className="flag">{flag(r.team?.country_alpha2)}</span>{' '}
-                        {r.team?.name ?? r.team?.short_name ?? r.team_id}
+                        {teamName(r.team?.name ?? null, r.team?.country_alpha2, lang) ?? r.team?.short_name ?? r.team_id}
                       </Link>
                     </td>
                     <td>{r.played ?? 0}</td>
@@ -184,49 +191,46 @@ export default async function GroupsPage() {
 
       {ladderReady && (
         <div className="card" style={{ marginTop: 28 }}>
-          <h2>Group stage as one league</h2>
+          <h2>{t.groups.ladderTitle}</h2>
           <p className="muted" style={{ marginTop: 0 }}>
-            All 48 teams in a single cross-group table, banded by finishing position and ranked by points · goal
-            difference · goals (pre-tournament: Elo seed). The top two of every group plus the{' '}
-            <b>8 best third-placed</b> teams — <b>32 in total</b> — cross the line into the Round of 32; the bottom 4
-            thirds and all 12 fourth-placed teams are out.
+            {t.groups.ladderIntro}
           </p>
           <div className="tblwrap">
           <table className="tbl">
             <thead>
               <tr>
                 <th>#</th>
-                <th style={{ textAlign: 'left' }}>Team</th>
-                <th>Grp</th>
-                <th>P</th>
-                <th>W</th>
-                <th>D</th>
-                <th>L</th>
-                <th>GF</th>
-                <th>GA</th>
-                <th>GD</th>
-                <th>Pts</th>
-                {hasSim && <th>Adv</th>}
+                <th style={{ textAlign: 'left' }}>{t.groups.th.team}</th>
+                <th>{t.groups.th.grp}</th>
+                <th>{t.groups.th.p}</th>
+                <th>{t.groups.th.w}</th>
+                <th>{t.groups.th.d}</th>
+                <th>{t.groups.th.l}</th>
+                <th>{t.groups.th.gf}</th>
+                <th>{t.groups.th.ga}</th>
+                <th>{t.groups.th.gd}</th>
+                <th>{t.groups.th.pts}</th>
+                {hasSim && <th>{t.groups.th.adv}</th>}
               </tr>
             </thead>
             <tbody>
-              {head('Group winners', 'advance · 12', 'adv')}
+              {head(t.groups.tierWinners, t.groups.tagAdvance(12), 'adv')}
               {winners.map((r, i) => teamRow(r, i + 1, { q: true }))}
-              {head('Runners-up', 'advance · 12', 'adv')}
+              {head(t.groups.tierRunners, t.groups.tagAdvance(12), 'adv')}
               {runners.map((r, i) => teamRow(r, i + 1, { q: true }))}
-              {head('Third-placed — best 8', 'advance · 8', 'adv')}
+              {head(t.groups.tierThirds, t.groups.tagAdvance(8), 'adv')}
               {thirdsAdv.map((r, i) => teamRow(r, i + 1, { q: true }))}
               <tr className="cutbar">
                 <td colSpan={cols}>
                   <div className="bar">
                     <span className="ln" />
-                    <span className="lbl2">Round of 32 cutoff — top 32 qualify</span>
+                    <span className="lbl2">{t.groups.cutoff}</span>
                     <span className="ln r" />
                   </div>
                 </td>
               </tr>
               {thirdsOut.map((r, i) => teamRow(r, i + 9, { out: true }))}
-              {head('Fourth-placed', 'eliminated · 12', 'out')}
+              {head(t.groups.tierFourths, t.groups.tagOut(12), 'out')}
               {fourths.map((r, i) => teamRow(r, i + 1, { out: true }))}
             </tbody>
           </table>

@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTeamHistory, getTeamInfo, getTeamUpcoming } from '@/lib/data';
 import { flag, fmtDay, fmtTime } from '@/lib/format';
+import { groupLabel, resultLetter, teamName } from '@/lib/i18n';
+import { getDict } from '@/lib/lang';
 import type { TeamMatch } from '@/lib/types';
 import { RealtimeRefresh } from '../../components/RealtimeRefresh';
 
@@ -10,7 +12,8 @@ export const dynamic = 'force-dynamic';
 export default async function TeamPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const teamId = Number(id);
-  const [team, history, upcoming] = await Promise.all([
+  const [{ lang, t }, team, history, upcoming] = await Promise.all([
+    getDict(),
     getTeamInfo(teamId),
     getTeamHistory(teamId),
     getTeamUpcoming(teamId),
@@ -37,7 +40,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
       <RealtimeRefresh table="team_match" filter={`team_id=eq.${teamId}`} />
       <p style={{ marginTop: 24 }}>
         <Link href="/teams" className="muted small">
-          ← Teams
+          {t.team.back}
         </Link>
       </p>
 
@@ -46,7 +49,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
           <span className="flag" style={{ fontSize: '2rem' }}>
             {flag(team.country_alpha2)}
           </span>
-          <h1 style={{ margin: 0 }}>{team.name ?? team.short_name}</h1>
+          <h1 style={{ margin: 0 }}>{teamName(team.name, team.country_alpha2, lang) ?? team.short_name}</h1>
         </div>
 
         {n > 0 ? (
@@ -54,39 +57,39 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
             <div className="statbar" style={{ marginTop: 14 }}>
               <div className="stat">
                 <b>{n}</b>
-                <span className="muted small">matches</span>
+                <span className="muted small">{t.team.matches}</span>
               </div>
               <div className="stat">
                 <b>
                   {w}-{d}-{l}
                 </b>
-                <span className="muted small">W-D-L</span>
+                <span className="muted small">{t.team.wdl}</span>
               </div>
               <div className="stat">
                 <b>{winPct}%</b>
-                <span className="muted small">win rate</span>
+                <span className="muted small">{t.team.winRate}</span>
               </div>
               <div className="stat">
                 <b>
                   {gf}:{ga}
                 </b>
-                <span className="muted small">goals</span>
+                <span className="muted small">{t.team.goals}</span>
               </div>
             </div>
             <div className="formrow" style={{ marginTop: 12 }}>
               {recent.map((h) => (
                 <span key={h.event_id} className={`res ${h.result ?? ''}`}>
-                  {h.result}
+                  {resultLetter(h.result, lang)}
                 </span>
               ))}
               <span className="muted small" style={{ alignSelf: 'center', marginLeft: 6 }}>
-                recent form (newest first)
+                {t.team.recentForm}
               </span>
             </div>
           </>
         ) : (
           <p className="muted" style={{ marginTop: 12 }}>
-            History still loading — run <code>npm run history</code> in the fetcher.
+            {t.team.historyLoading}
           </p>
         )}
       </div>
@@ -95,7 +98,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
       {upcoming.length > 0 && (
         <div>
           <div className="dayhdr">
-            <h3>Upcoming</h3>
+            <h3>{t.team.upcoming}</h3>
             <span className="muted small">{upcoming.length}</span>
             <span className="ln" />
           </div>
@@ -107,19 +110,21 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
               const live = m.status_type === 'inprogress';
               return (
                 <Link className="urow" key={m.ss_id} href={`/match/${m.ss_id}`}>
-                  <span className="hdate">{fmtDay(m.start_ts)}</span>
-                  <span className="venue" style={{ justifySelf: 'center' }}>{isHome ? 'H' : 'A'}</span>
+                  <span className="hdate">{fmtDay(m.start_ts, lang)}</span>
+                  <span className="venue" style={{ justifySelf: 'center' }}>
+                    {isHome ? t.common.homeShort : t.common.awayShort}
+                  </span>
                   <span className="hopp">
                     <span className="flag">{flag(oppAlpha2)}</span>
-                    <span className="nm">{oppName ?? 'TBD'}</span>
+                    <span className="nm">{teamName(oppName, oppAlpha2, lang) ?? t.common.tbd}</span>
                   </span>
                   <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                     {live ? (
-                      <span className="chip live">LIVE</span>
+                      <span className="chip live">{t.common.live}</span>
                     ) : (
                       <span className="kick">{fmtTime(m.start_ts)}</span>
                     )}
-                    {m.group_name && <span className="chip group">{m.group_name}</span>}
+                    {m.group_name && <span className="chip group">{groupLabel(m.group_name, lang)}</span>}
                   </span>
                 </Link>
               );
@@ -131,7 +136,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
       {/* PRESENT limiter — above is FUTURE, below is PAST */}
       <div className="nowline" role="separator" aria-label="Present — future above, past below">
         <span className="ln l" />
-        <span className="now">PRESENT</span>
+        <span className="now">{t.team.present}</span>
         <span className="ln r" />
       </div>
 
@@ -146,12 +151,12 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
           <div className="card" style={{ padding: '4px 14px' }}>
             {ms.map((h) => (
               <Link className="hrow" key={h.event_id} href={`/match/${h.event_id}`}>
-                <span className="hdate">{fmtDay(h.start_ts)}</span>
-                <span className={`res ${h.result ?? ''}`}>{h.result}</span>
+                <span className="hdate">{fmtDay(h.start_ts, lang)}</span>
+                <span className={`res ${h.result ?? ''}`}>{resultLetter(h.result, lang)}</span>
                 <span className="hopp">
-                  <span className="venue">{h.is_home ? 'H' : 'A'}</span>
+                  <span className="venue">{h.is_home ? t.common.homeShort : t.common.awayShort}</span>
                   <span className="flag">{flag(h.opponent_alpha2)}</span>
-                  <span className="nm">{h.opponent_name ?? 'Unknown'}</span>
+                  <span className="nm">{teamName(h.opponent_name, h.opponent_alpha2, lang) ?? t.common.unknown}</span>
                 </span>
                 <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                   <span className="hsc">

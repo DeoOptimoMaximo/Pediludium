@@ -11,7 +11,7 @@ function parts(ms: number) {
   };
 }
 
-export function Countdown({ toIso }: { toIso: string }) {
+export function Countdown({ toIso, labels }: { toIso: string; labels: [string, string, string, string] }) {
   const target = new Date(toIso).getTime();
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
@@ -23,10 +23,10 @@ export function Countdown({ toIso }: { toIso: string }) {
   const p = parts(target - now);
   return (
     <div className="countdown">
-      {([['d', p.d], ['h', p.h], ['m', p.m], ['s', p.s]] as const).map(([k, v]) => (
+      {([[labels[0], p.d], [labels[1], p.h], [labels[2], p.m], [labels[3], p.s]] as const).map(([k, v]) => (
         <div className="cd-box" key={k}>
           <b>{String(v).padStart(2, '0')}</b>
-          <span className="small muted">{k.toUpperCase()}</span>
+          <span className="small muted">{k}</span>
         </div>
       ))}
     </div>

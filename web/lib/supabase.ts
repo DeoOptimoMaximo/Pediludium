@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * Supabase client (anon key + RLS public-read). The web app NEVER calls SofaScore —
+ * Supabase client (anon key + RLS public-read). The web app NEVER calls the upstream source —
  * it reads only from our DB, which the home fetcher fills (docs/04 golden rule).
  */
 export function supa() {
