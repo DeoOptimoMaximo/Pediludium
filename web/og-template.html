@@ -1,0 +1,45 @@
+<!doctype html>
+<!-- Source template for public/og.png (1200x630). Regenerate: node scripts/render-og.mjs -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 630px; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: #ffffff;
+    color: #002F6C;
+    display: flex;
+    flex-direction: column;
+  }
+  .main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 64px;
+    padding: 0 88px;
+  }
+  .logo { width: 280px; height: 280px; flex: none; }
+  .title { font-size: 88px; font-weight: 800; letter-spacing: -2px; line-height: 1.05; }
+  .subtitle { margin-top: 28px; font-size: 38px; font-weight: 600; color: #FF0000; }
+  .desc { margin-top: 18px; font-size: 28px; font-weight: 400; color: #4a5a74; line-height: 1.35; max-width: 640px; }
+  .tricolor { height: 18px; display: flex; flex: none; }
+  .tricolor span { flex: 1; }
+  .tricolor .r { background: #FF0000; }
+  .tricolor .w { background: #ffffff; border-top: 1px solid #E1E5EA; }
+  .tricolor .n { background: #002F6C; }
+</style>
+</head>
+<body>
+  <div class="main">
+    <img class="logo" src="public/logo.svg" alt="">
+    <div>
+      <div class="title">Lopta je okrugla</div>
+      <div class="subtitle">Svjetsko prvenstvo 2026</div>
+      <div class="desc">Otvorena nogometna analitika — predikcije utakmica i Monte-Carlo izgledi turnira.</div>
+    </div>
+  </div>
+  <div class="tricolor"><span class="r"></span><span class="w"></span><span class="n"></span></div>
+</body>
+</html>
