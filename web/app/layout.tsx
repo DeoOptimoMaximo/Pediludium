@@ -51,6 +51,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         <Nav lang={lang} theme={theme} layout={layout} />
         <main className="container">{children}</main>
+        <script
+          defer
+          src="https://static.cloudflareinsights.com/beacon.min.js"
+          data-cf-beacon='{"token": "84ead45314724f59905c5a5ccbd19bd1"}'
+        />
       </body>
     </html>
   );
