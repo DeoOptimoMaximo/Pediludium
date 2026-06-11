@@ -31,6 +31,7 @@ practices.
 | [11-android-app-investigation.md](./11-android-app-investigation.md) | Zašto app prolazi a browser ne (OkHttp potpis) |
 | [12-realtime-notes.md](./12-realtime-notes.md) | Realtime end-to-end + REPLICA IDENTITY FULL kvaka |
 | [13-simulation-model.md](./13-simulation-model.md) | Dixon-Coles + Monte-Carlo simulacija turnira (advance/win-cup odds) |
+| [14-public-deploy-and-snapshots.md](./14-public-deploy-and-snapshots.md) | Javni Cloudflare deploy (nogomet.domovina.ai), satni snapshot pipeline, R2 povijest, brand „Lopta je okrugla" + i18n |
 
 ## Tech stack (dogovoreno)
 
