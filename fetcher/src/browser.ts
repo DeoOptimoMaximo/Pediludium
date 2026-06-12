@@ -195,6 +195,70 @@ export async function harvest(
   }, 'harvest');
 }
 
+/**
+ * Open one match's view inside the already-warm SPA (client-side route — dodges the
+ * deep-link 403) and harvest its per-match /api/v1 responses. Routes by clicking an
+ * existing link to the match if the entry page lists it, else via History pushState
+ * (the SPA router listens to popstate). Scrolls to coax lazy sections. Returns the
+ * captured bodies keyed by API path. Call `warmEntry()` once before the first match.
+ *
+ * Reliable: /event/{id}/{lineups,odds,votes,incidents}. The Statistics sub-tab
+ * (/statistics, /shotmap) does not fire from the summary view — captured opportunistically
+ * if present, otherwise absent (docs/15 follow-up).
+ */
+export async function harvestMatchView(
+  m: { eventId: number; slug: string; customId: string },
+  want: RegExp,
+): Promise<Map<string, HarvestHit>> {
+  return client.run(async () => {
+    const p = await ensurePage();
+    const hits = new Map<string, HarvestHit>();
+    const pending: Promise<void>[] = [];
+    const onResponse = (resp: PWResponse): void => {
+      const mm = resp.url().match(API_RE);
+      if (!mm) return;
+      const path = mm[1]!.split('?')[0]!;
+      if (!want.test(path)) return;
+      if (resp.status() !== 200) {
+        hits.set(path, { status: resp.status() });
+        return;
+      }
+      pending.push(
+        resp
+          .json()
+          .then((body: unknown) => void hits.set(path, { status: 200, body }))
+          .catch(() => void hits.set(path, { status: resp.status() })),
+      );
+    };
+    p.on('response', onResponse);
+    try {
+      await p.evaluate(
+        ({ slug, customId, eventId }) => {
+          // runs in the browser; globalThis-as-any avoids pulling the DOM lib into Node tsc
+          const g = globalThis as any;
+          const link = g.document.querySelector(`a[href*="/match/${slug}/"]`);
+          if (link) link.click();
+          else {
+            g.history.pushState({}, '', `/football/match/${slug}/${customId}#id:${eventId}`);
+            g.dispatchEvent(new g.PopStateEvent('popstate'));
+          }
+        },
+        { slug: m.slug, customId: m.customId, eventId: m.eventId },
+      );
+      await p.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => undefined);
+      await sleep(3000);
+      for (let i = 0; i < 6; i++) {
+        await p.mouse.wheel(0, 1400).catch(() => undefined);
+        await sleep(900);
+      }
+      await Promise.allSettled(pending);
+    } finally {
+      p.off('response', onResponse);
+    }
+    return hits;
+  }, `match ${m.eventId}`);
+}
+
 /** Tear down Chrome. Call once at the end of a run. */
 export async function closeBrowser(): Promise<void> {
   warmed = false;

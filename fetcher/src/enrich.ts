@@ -1,12 +1,5 @@
 import { WORLD_CUP } from './config.ts';
-import { closeBrowser, getJson } from './browser.ts';
-import {
-  EventLineupsResponseSchema,
-  EventOddsResponseSchema,
-  EventShotmapResponseSchema,
-  EventStatisticsResponseSchema,
-  EventVotesResponseSchema,
-} from './schemas.ts';
+import { closeBrowser, harvestMatchView, warmEntry, type HarvestHit } from './browser.ts';
 import {
   closeDb,
   dbQuery,
@@ -20,21 +13,23 @@ import {
 /**
  * Per-match enrichment tick (`npm run enrich`) — pulls the richer SofaScore payloads the
  * models and the UI build on: team statistics (xG!), lineups (missing players), 1X2 odds,
- * fan votes, shotmap. Same polite browser transport as refresh; budget-aware:
- *   - odds + votes   → matches kicking off within ODDS_WINDOW_H (re-captured every tick,
- *                      so the stored row converges to the closing odds), plus one
- *                      post-hoc capture if we never saw the match pre-kickoff
- *   - lineups        → from LINEUP_WINDOW_MIN before kick-off (XI publishes ~1h ahead),
- *                      while live, and once more after the final whistle
- *   - stats + shotmap → while live, and once more after the final whistle
- * A row whose status_at_fetch is 'finished' is final and never refetched. Endpoints 404
- * until their data exists (e.g. shotmap pre-match) — those failures are logged + skipped.
+ * fan votes, shotmap. Uses the PIGGYBACK transport (docs/15): direct /api/v1 calls are
+ * challenge-blocked, so we open each match's view inside the warm SPA and harvest the
+ * responses its own JS fires. One match view reliably yields lineups + odds + votes;
+ * statistics + shotmap sit behind the Statistics sub-tab and are captured only when present
+ * (follow-up). Budget-aware which matches to visit:
+ *   - odds + votes   → matches kicking off within ODDS_WINDOW_H (re-visited each tick, so the
+ *                      stored row converges to the closing odds), plus a post-hoc visit if missed
+ *   - lineups        → from LINEUP_WINDOW_MIN before kick-off, while live, once after FT
+ *   - stats + shotmap → while live, and once after FT
+ * A row whose status_at_fetch is 'finished' is final and not re-fetched. Requires a working
+ * egress (SOFA_PROXY_SERVER = the mobile proxy); the phone must be foreground.
  */
 
 const S = WORLD_CUP.seasonId2026;
 const ODDS_WINDOW_H = Number(process.env.ENRICH_ODDS_WINDOW_H ?? 48);
 const LINEUP_WINDOW_MIN = Number(process.env.ENRICH_LINEUP_WINDOW_MIN ?? 90);
-const MAX_REQUESTS = Number(process.env.ENRICH_MAX_REQ ?? 60);
+const MAX_MATCHES = Number(process.env.ENRICH_MAX_MATCHES ?? 12);
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type AnyObj = Record<string, any>;
@@ -43,6 +38,8 @@ interface Candidate {
   ss_id: number;
   status_type: string | null;
   start_ts: string;
+  slug: string | null;
+  custom_id: string | null;
   stats_at: string | null;
   lineups_at: string | null;
   odds_at: string | null;
@@ -53,6 +50,7 @@ interface Candidate {
 async function loadCandidates(): Promise<Candidate[]> {
   const rows = await dbQuery<Candidate & { ss_id: string }>(
     `select m.ss_id, m.status_type, m.start_ts,
+            m.raw->>'slug' as slug, m.raw->>'customId' as custom_id,
             st.status_at_fetch as stats_at,
             lu.status_at_fetch as lineups_at,
             od.status_at_fetch as odds_at,
@@ -133,18 +131,15 @@ export function parseVotes(raw: AnyObj): { votes_home: number | null; votes_draw
 
 /* ── tick planning ── */
 
-interface Job {
-  matchId: number;
-  kind: 'statistics' | 'lineups' | 'odds' | 'votes' | 'shotmap';
-  run: () => Promise<void>;
-}
+type Kind = 'statistics' | 'lineups' | 'odds' | 'votes' | 'shotmap';
 
-export function wantsEnrichment(c: Pick<Candidate, 'status_type' | 'start_ts' | 'stats_at' | 'lineups_at' | 'odds_at' | 'votes_at' | 'shotmap_at'>, now: Date): Job['kind'][] {
+/** Which payloads this match still wants (drives whether it's worth a match-view visit). */
+export function wantsEnrichment(c: Pick<Candidate, 'status_type' | 'start_ts' | 'stats_at' | 'lineups_at' | 'odds_at' | 'votes_at' | 'shotmap_at'>, now: Date): Kind[] {
   const minsToKickoff = (new Date(c.start_ts).getTime() - now.getTime()) / 60_000;
   const upcoming = c.status_type === 'notstarted';
   const live = c.status_type === 'inprogress';
   const finished = c.status_type === 'finished';
-  const kinds: Job['kind'][] = [];
+  const kinds: Kind[] = [];
 
   // pre-match markets/crowd: every tick inside the window; once post-hoc if missed
   const preWindow = upcoming && minsToKickoff <= ODDS_WINDOW_H * 60;
@@ -158,66 +153,86 @@ export function wantsEnrichment(c: Pick<Candidate, 'status_type' | 'start_ts' | 
   return kinds;
 }
 
-function jobOf(c: Candidate, kind: Job['kind']): Job {
+const MATCH_WANT = /\/event\/\d+\/(statistics|lineups|votes|shotmap|odds\/1\/all)$/;
+
+/** Upsert whatever payloads we captured from one match view. Returns the kinds stored. */
+async function upsertFromHarvest(c: Candidate, hits: Map<string, HarvestHit>): Promise<Kind[]> {
   const id = c.ss_id;
   const status = c.status_type ?? null;
-  const runs: Record<Job['kind'], () => Promise<void>> = {
-    statistics: async () => {
-      const { raw } = await getJson(`/event/${id}/statistics`, EventStatisticsResponseSchema);
-      await upsertMatchStatistics({ match_id: id, status_at_fetch: status, ...parseStatistics(raw as AnyObj), raw });
-    },
-    lineups: async () => {
-      const { raw } = await getJson(`/event/${id}/lineups`, EventLineupsResponseSchema);
-      const r = raw as AnyObj;
-      await upsertMatchLineups({
-        match_id: id,
-        status_at_fetch: status,
-        confirmed: typeof r.confirmed === 'boolean' ? r.confirmed : null,
-        home_formation: r.home?.formation ?? null,
-        away_formation: r.away?.formation ?? null,
-        // arrays must be pre-stringified: node-pg would render a JS array as a PG array literal
-        home_missing: JSON.stringify(r.home?.missingPlayers ?? []),
-        away_missing: JSON.stringify(r.away?.missingPlayers ?? []),
-        raw,
-      });
-    },
-    odds: async () => {
-      const { raw } = await getJson(`/event/${id}/odds/1/all`, EventOddsResponseSchema);
-      await upsertMatchOdds({ match_id: id, status_at_fetch: status, ...parseOdds(raw as AnyObj), raw });
-    },
-    votes: async () => {
-      const { raw } = await getJson(`/event/${id}/votes`, EventVotesResponseSchema);
-      await upsertMatchVotes({ match_id: id, status_at_fetch: status, ...parseVotes(raw as AnyObj), raw });
-    },
-    shotmap: async () => {
-      const { raw } = await getJson(`/event/${id}/shotmap`, EventShotmapResponseSchema);
-      await upsertMatchShotmap(id, status, JSON.stringify((raw as AnyObj).shotmap ?? []));
-    },
+  const stored: Kind[] = [];
+  const bodyOf = (suffix: string): AnyObj | undefined => {
+    for (const [path, hit] of hits) {
+      if (path.endsWith(`/event/${id}/${suffix}`) && hit.status === 200 && hit.body) return hit.body as AnyObj;
+    }
+    return undefined;
   };
-  return { matchId: id, kind, run: runs[kind] };
+
+  const lineups = bodyOf('lineups');
+  if (lineups) {
+    await upsertMatchLineups({
+      match_id: id,
+      status_at_fetch: status,
+      confirmed: typeof lineups.confirmed === 'boolean' ? lineups.confirmed : null,
+      home_formation: lineups.home?.formation ?? null,
+      away_formation: lineups.away?.formation ?? null,
+      // arrays must be pre-stringified: node-pg would render a JS array as a PG array literal
+      home_missing: JSON.stringify(lineups.home?.missingPlayers ?? []),
+      away_missing: JSON.stringify(lineups.away?.missingPlayers ?? []),
+      raw: lineups,
+    });
+    stored.push('lineups');
+  }
+  const odds = bodyOf('odds/1/all');
+  if (odds) {
+    await upsertMatchOdds({ match_id: id, status_at_fetch: status, ...parseOdds(odds), raw: odds });
+    stored.push('odds');
+  }
+  const votes = bodyOf('votes');
+  if (votes) {
+    await upsertMatchVotes({ match_id: id, status_at_fetch: status, ...parseVotes(votes), raw: votes });
+    stored.push('votes');
+  }
+  const stats = bodyOf('statistics');
+  if (stats) {
+    await upsertMatchStatistics({ match_id: id, status_at_fetch: status, ...parseStatistics(stats), raw: stats });
+    stored.push('statistics');
+  }
+  const shotmap = bodyOf('shotmap');
+  if (shotmap) {
+    await upsertMatchShotmap(id, status, JSON.stringify(shotmap.shotmap ?? []));
+    stored.push('shotmap');
+  }
+  return stored;
 }
 
 async function main(): Promise<void> {
   const now = new Date();
   const candidates = await loadCandidates();
-  const jobs: Job[] = [];
-  for (const c of candidates) for (const kind of wantsEnrichment(c, now)) jobs.push(jobOf(c, kind));
-
-  if (jobs.length > MAX_REQUESTS) {
-    console.warn(`[enrich] ${jobs.length} jobs planned, capping at ${MAX_REQUESTS} (ENRICH_MAX_REQ)`);
+  const todo = candidates.filter((c) => c.slug && wantsEnrichment(c, now).length > 0);
+  const visit = todo.slice(0, MAX_MATCHES);
+  if (todo.length > visit.length) {
+    console.warn(`[enrich] ${todo.length} matches want enrichment, visiting ${visit.length} this tick (ENRICH_MAX_MATCHES)`);
   }
-  let ok = 0;
-  let failed = 0;
-  for (const job of jobs.slice(0, MAX_REQUESTS)) {
+  if (visit.length === 0) {
+    console.log('[enrich] nothing to enrich this tick');
+    return;
+  }
+
+  await warmEntry('/football');
+  let visited = 0;
+  const tally: Record<string, number> = {};
+  for (const c of visit) {
     try {
-      await job.run();
-      ok++;
+      const hits = await harvestMatchView({ eventId: c.ss_id, slug: c.slug!, customId: c.custom_id ?? '' }, MATCH_WANT);
+      const stored = await upsertFromHarvest(c, hits);
+      for (const k of stored) tally[k] = (tally[k] ?? 0) + 1;
+      visited++;
     } catch (err) {
-      failed++; // 404 = data not published yet (e.g. shotmap pre-match) — normal, retried next tick
-      console.warn(`[enrich] ${job.kind} ${job.matchId}: ${String(err).slice(0, 90)}`);
+      console.warn(`[enrich] match ${c.ss_id}: ${String(err).slice(0, 90)}`);
     }
   }
-  console.log(`[enrich] ${ok} fetched, ${failed} skipped/failed of ${jobs.length} planned (${candidates.length} matches scanned)`);
+  const summary = Object.entries(tally).map(([k, n]) => `${k}=${n}`).join(' ') || 'nothing stored';
+  console.log(`[enrich] visited ${visited}/${visit.length} match views · stored ${summary}`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
