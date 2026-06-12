@@ -1,5 +1,5 @@
 import { WORLD_CUP } from './config.ts';
-import { closeBrowser, getJson } from './browser.ts';
+import { closeBrowser, getJson, harvest } from './browser.ts';
 import { EventResponseSchema, EventsResponseSchema } from './schemas.ts';
 import { closeDb, dbQuery, upsertMatch } from './db.ts';
 import { matchRowOf } from './map.ts';
@@ -71,15 +71,54 @@ export async function refreshSchedule(): Promise<number> {
   return n;
 }
 
-async function main(): Promise<void> {
-  const full = process.argv.includes('--full');
-  if (full) {
-    const n = await refreshSchedule();
-    console.log(`[refresh] schedule re-pulled: ${n} matches`);
+/* ── piggyback refresh (docs/15) ───────────────────────────────────────────────
+ * Direct /api/v1 calls are challenged (403) since 2026-06-11. The site's OWN SPA calls
+ * still pass, so we land on an allowed entry page and harvest the responses it fires for
+ * free — which include the full WC schedule feed (events/next/0, ~200 KB), the date-keyed
+ * WC fixtures, and individual /event/{id} details. We upsert every WC (tournament 16)
+ * event we capture. Requires a non-blocked egress (SOFA_PROXY_SERVER = the mobile proxy,
+ * or a cooled-down IP). */
+
+const WC_EVENTS_RE =
+  /\/unique-tournament\/16\/(season\/\d+\/events\/(next|last)\/\d+|scheduled-events\/)|\/event\/\d+$/;
+
+export async function refreshViaPiggyback(): Promise<number> {
+  // harvest's own navigation loads the entry page and captures the SPA's calls — no
+  // separate warm step needed when we're harvesting the very page we land on
+  const hits = await harvest(
+    (p) => p.goto('https://www.sofascore.com/football', { waitUntil: 'domcontentloaded', timeout: 60_000 }).then(() => undefined),
+    WC_EVENTS_RE,
+  );
+
+  const events: AnyObj[] = [];
+  for (const [, hit] of hits) {
+    if (hit.status !== 200 || !hit.body) continue;
+    const b = hit.body as AnyObj;
+    if (Array.isArray(b.events)) events.push(...(b.events as AnyObj[])); // feed / scheduled-events
+    else if (b.event) events.push(b.event as AnyObj); // single /event/{id}
   }
-  const active = await activeMatchIds();
-  const updated = await refreshActive();
-  console.log(`[refresh] active matches: ${active.length}, updated: ${updated}`);
+
+  let n = 0;
+  const seen = new Set<number>();
+  for (const e of events) {
+    // keep only World Cup (unique-tournament 16) events; scheduled-events mixes competitions
+    const utid = e.tournament?.uniqueTournament?.id ?? e.tournament?.id;
+    if (utid !== WORLD_CUP.uniqueTournamentId) continue;
+    if (seen.has(e.id)) continue;
+    seen.add(e.id);
+    await upsertMatch(matchRowOf(e));
+    n++;
+  }
+  return n;
+}
+
+async function main(): Promise<void> {
+  // bare-goto transport is dead (403 challenge) — piggyback is the working path
+  const n = await refreshViaPiggyback();
+  console.log(`[refresh] piggyback: ${n} WC matches upserted`);
+  if (n === 0) {
+    console.warn('[refresh] 0 matches — egress likely blocked; set SOFA_PROXY_SERVER to the mobile proxy');
+  }
 }
 
 // run as a one-shot only when invoked directly (the scheduler imports the functions instead)

@@ -2,7 +2,7 @@ import type { Browser, BrowserContext, Page, Response as PWResponse } from 'play
 import { chromium } from 'playwright-core';
 import { z } from 'zod';
 import { config } from './config.ts';
-import { PoliteClient, RateLimitedError } from './politeness.ts';
+import { PoliteClient, RateLimitedError, sleep } from './politeness.ts';
 import { detectIphoneSource, startSourceProxy, type SourceProxy } from './source-proxy.ts';
 import type { FetchResult } from './http.ts';
 
@@ -32,8 +32,14 @@ let page: Page | undefined;
 let launching: Promise<Page> | undefined;
 let sourceProxy: SourceProxy | undefined;
 
-/** Resolve egress source IP: explicit SOFA_SOURCE_ADDR, else SOFA_VIA_IPHONE auto-detect. */
+/** Resolve Chrome's egress proxy: a direct upstream proxy (SOFA_PROXY_SERVER, e.g. the
+ * mobile-phone-proxy over Tailscale) wins; else a local source-address proxy bound to
+ * SOFA_SOURCE_ADDR / the SOFA_VIA_IPHONE tether. Undefined = the Mac's default route. */
 async function resolveProxyServer(): Promise<string | undefined> {
+  if (config.proxyServer) {
+    console.log(`[browser] egress via upstream proxy ${config.proxyServer}`);
+    return config.proxyServer;
+  }
   const explicit = config.sourceAddr;
   const viaIphone = process.env.SOFA_VIA_IPHONE === '1';
   const src = explicit ?? (viaIphone ? detectIphoneSource() : undefined);
@@ -101,8 +107,97 @@ export async function getJson<T>(path: string, schema: z.ZodType<T>): Promise<Fe
   }, path);
 }
 
+/* ── piggyback transport (2026-06 challenge mitigation) ────────────────────────
+ * As of ~2026-06-11 SofaScore challenges direct /api/v1 calls AND deep-link page
+ * navigations (match/tournament pages → 403 on the HTML). Only entry pages load, and
+ * their own SPA JS makes /api/v1 calls that DO pass (it computes the per-request
+ * x-requested-with signature we can't replicate). So instead of requesting endpoints
+ * ourselves, we let the SPA request them and harvest its responses.
+ *
+ * `harvest(navigate, want)`: capture every /api/v1 response body whose path matches
+ * `want` while `navigate` drives the page (SPA click / in-app routing). Routed through
+ * the polite queue like getJson. `warmEntry()` lands on an allowed entry page once per
+ * process so the SPA is hydrated before we drive it.
+ *
+ * NOT YET WIRED INTO refresh/enrich: the orchestration (which entry page, which links to
+ * click to reach each match/standings view) needs live calibration against the SPA, which
+ * is blocked until the egress IP cools down (see docs/09; prefer SOFA_VIA_IPHONE for a
+ * fresh IP). See sofascore-challenge-block memory for the validation checklist. */
+
+const API_RE = /^https:\/\/(?:www|api)\.sofascore\.com(\/api\/v1\/.+)$/;
+let warmed = false;
+
+/** Land on an allowed entry page once per process so the SPA session is established. */
+export async function warmEntry(entryPath = '/football'): Promise<void> {
+  if (warmed) return;
+  await client.run(async () => {
+    const p = await ensurePage();
+    const resp = await p.goto(`https://www.sofascore.com${entryPath}`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 45_000,
+    });
+    const status = resp?.status() ?? 0;
+    if (status === 403 || status === 429) {
+      throw new RateLimitedError(status, parseRetryAfter(resp?.headers()['retry-after']));
+    }
+    await p.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => undefined);
+    warmed = true;
+  }, `warm ${entryPath}`);
+}
+
+export interface HarvestHit {
+  status: number;
+  body?: unknown;
+}
+
+/**
+ * Drive the SPA via `navigate` and capture /api/v1 response bodies whose path matches
+ * `want`. Returns a map keyed by API path (query string stripped). `settleMs` lets late
+ * XHRs land after navigation settles. The capture itself never throws on a single bad
+ * response; a 403 on the *navigation* surfaces via RateLimitedError from `navigate`.
+ */
+export async function harvest(
+  navigate: (page: Page) => Promise<void>,
+  want: RegExp,
+  settleMs = 6000,
+): Promise<Map<string, HarvestHit>> {
+  return client.run(async () => {
+    const p = await ensurePage();
+    const hits = new Map<string, HarvestHit>();
+    const pending: Promise<void>[] = [];
+    const onResponse = (resp: PWResponse): void => {
+      const m = resp.url().match(API_RE);
+      if (!m) return;
+      const path = m[1]!.split('?')[0]!;
+      if (!want.test(path)) return;
+      const status = resp.status();
+      if (status !== 200) {
+        hits.set(path, { status });
+        return;
+      }
+      pending.push(
+        resp
+          .json()
+          .then((body: unknown) => void hits.set(path, { status, body }))
+          .catch(() => void hits.set(path, { status })),
+      );
+    };
+    p.on('response', onResponse);
+    try {
+      await navigate(p);
+      await p.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => undefined);
+      await sleep(settleMs);
+      await Promise.allSettled(pending);
+    } finally {
+      p.off('response', onResponse);
+    }
+    return hits;
+  }, 'harvest');
+}
+
 /** Tear down Chrome. Call once at the end of a run. */
 export async function closeBrowser(): Promise<void> {
+  warmed = false;
   if (browser) await browser.close();
   if (sourceProxy) sourceProxy.close();
   browser = undefined;

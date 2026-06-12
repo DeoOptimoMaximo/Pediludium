@@ -18,6 +18,10 @@ const ConfigSchema = z.object({
   // egress source IP for browser fetches (e.g. iPhone tether 172.20.10.x → mobile IP).
   // Empty = use default route. Or set SOFA_VIA_IPHONE=1 to auto-detect the tether.
   sourceAddr: z.string().optional(),
+  // direct upstream HTTP CONNECT proxy for browser egress (e.g. the mobile-phone-proxy on
+  // the iPhone over Tailscale: http://100.71.146.11:8888 → Telemach cellular IP). Takes
+  // precedence over sourceAddr/VIA_IPHONE — no local source-address proxy is started.
+  proxyServer: z.string().optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -34,6 +38,7 @@ export const config: Config = ConfigSchema.parse({
   sampleDir: process.env.SOFA_SAMPLE_DIR,
   dbUrl: process.env.SUPABASE_DB_URL,
   sourceAddr: process.env.SOFA_SOURCE_ADDR,
+  proxyServer: process.env.SOFA_PROXY_SERVER,
 });
 
 /**

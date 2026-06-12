@@ -5,7 +5,8 @@
 # nogomet.domovina.ai serves.
 #
 # What runs inside the hourly tick (politeness budget: docs/10):
-#   every hour   refresh --full (scores + schedule, ~5 req) → predict:dc → simulate → snapshot
+#   every hour   refresh --full (scores + schedule, ~5 req) → enrich (xG/lineups/odds/votes/
+#                shotmap, windowed, ≤60 req) → predict:dc → simulate → snapshot
 #   02 08 14 20  + backfill (standings + group tagging — "mali" queue per docs/10)
 #   04           + history & baseline predict (nightly bulk, medium delays)
 #
@@ -15,6 +16,14 @@
 set -u
 export PATH="/Users/ms/.nvm/versions/node/v24.16.0/bin:/usr/local/bin:/usr/bin:/bin"
 export SOFA_HEADLESS=1
+
+# SofaScore challenges direct /api/v1 calls + the home IP since 2026-06-11 (docs/15), so
+# egress goes through the iPhone mobile-phone-proxy over Tailscale (Telemach cellular IP).
+# The SPA's own calls pass; refresh/piggyback harvests them. If the phone proxy is asleep
+# (iOS suspends the foreground listener) refresh upserts 0 and warns — the rest of the
+# pipeline still runs on existing data (stale-but-consistent). Override/disable via env.
+: "${SOFA_PROXY_SERVER:=http://100.71.146.11:8888}"
+export SOFA_PROXY_SERVER
 
 FETCHER_DIR="/Users/ms/git/DeoOptimoMaximo/Pediludium/fetcher"
 LOCK_DIR="/tmp/pediludium-snapshot.lock"
@@ -37,15 +46,22 @@ HOUR=$(date +%H)
 echo "[$(date -u +%FT%TZ)] ===== hourly snapshot tick (local hour $HOUR) ====="
 
 step npm run refresh -- --full
+# enrich (xG/lineups/odds/votes/shotmap) is DISABLED in cron: it still uses direct /api/v1
+# calls which the 2026-06 challenge 403s even via the mobile IP (per-request, not just IP),
+# tripping the breaker and burning the proxy session. Re-enable once enrich is moved to the
+# piggyback match-view harvest (docs/15 validation checklist).
+# step npm run enrich
 
-case "$HOUR" in
-  02 | 08 | 14 | 20) step npm run backfill ;;
-esac
-
-if [ "$HOUR" = "04" ]; then
-  step env SOFA_DELAY_MIN_MS=2500 SOFA_DELAY_MAX_MS=6000 npm run history
-  step env SOFA_DELAY_MIN_MS=2500 SOFA_DELAY_MAX_MS=6000 npm run predict
-fi
+# backfill (standings + group tagging) and the nightly history/baseline fetch also use the
+# direct /api/v1 path → 403 under the 2026-06 challenge, so they're DISABLED to avoid burning
+# the mobile proxy IP with repeated blocks. Re-enable per hour once migrated to piggyback.
+# case "$HOUR" in
+#   02 | 08 | 14 | 20) step npm run backfill ;;
+# esac
+# if [ "$HOUR" = "04" ]; then
+#   step env SOFA_DELAY_MIN_MS=2500 SOFA_DELAY_MAX_MS=6000 npm run history
+#   step env SOFA_DELAY_MIN_MS=2500 SOFA_DELAY_MAX_MS=6000 npm run predict
+# fi
 
 # DB-only compute (zero SofaScore calls) + publish to Cloudflare KV/R2
 step npm run predict:dc
