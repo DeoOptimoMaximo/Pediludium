@@ -24,6 +24,8 @@ import { WORLD_CUP } from './config.ts';
 export const EVENT_SHARDS = 64;
 // time-series shards (mser:{match_id % MSER_SHARDS}) — mirror in web/lib/data-snapshot.ts
 export const MSER_SHARDS = 16;
+// the simulation model whose movements we surface on /movers (mirror SIM_MODEL in web)
+const SIM_MODEL_VERSION = 'mc-sim-v1';
 
 const OUT_DIR = path.resolve(import.meta.dirname, '..', 'snapshot');
 
@@ -246,7 +248,7 @@ async function exportCalibration(): Promise<Record<string, unknown[]>> {
   const rows = await dbQuery<{
     model_version: string;
     match_id: number;
-    start_ts: string;
+    start_ts: string | Date; // node-pg returns timestamptz as a Date
     home_score: number;
     away_score: number;
     p_home: number | null;
@@ -271,7 +273,7 @@ async function exportCalibration(): Promise<Record<string, unknown[]>> {
     const logloss = -Math.log(Math.max(p[outcome]!, 1e-9));
     (out[r.model_version] ??= []).push({
       match_id: r.match_id,
-      kickoff: r.start_ts,
+      kickoff: r.start_ts instanceof Date ? r.start_ts.toISOString() : r.start_ts,
       p: p.map((v) => Math.round(v * 10000) / 10000),
       outcome,
       brier: Math.round(brier * 10000) / 10000,
@@ -284,6 +286,61 @@ async function exportCalibration(): Promise<Record<string, unknown[]>> {
   return out;
 }
 
+/* ── biggest movers ──────────────────────────────────────────────────────
+ * Per team, the change in advance / title odds over a recent window: compare the
+ * latest simulation_history snapshot against the one nearest WINDOW_H hours earlier
+ * (falling back to the earliest snapshot when history is younger than the window).
+ * This is the "swing chart" data — it stays ~flat pre-tournament and lights up as
+ * results land and the Monte-Carlo refit moves probabilities. */
+
+const MOVERS_WINDOW_H = Number(process.env.MOVERS_WINDOW_H ?? 24);
+
+async function exportMovers(): Promise<{ window_h: number; from: string | null; to: string | null; teams: unknown[] }> {
+  const j = await jsonOne<{ window_h: number; from: string | null; to: string | null; teams: unknown[] } | null>(
+    `with bounds as (
+       select max(captured_at) as t_now, model_version
+         from public.simulation_history group by model_version
+     ),
+     dc as (  -- the simulation model we publish movers for
+       select * from public.simulation_history where model_version = '${SIM_MODEL_VERSION}'
+     ),
+     win as (
+       select (select t_now from bounds where model_version = '${SIM_MODEL_VERSION}') as t_now,
+              greatest(
+                (select min(captured_at) from dc),
+                (select t_now from bounds where model_version = '${SIM_MODEL_VERSION}') - interval '${MOVERS_WINDOW_H} hours'
+              ) as t_ref
+     ),
+     now_row as (
+       select distinct on (team_id) team_id, p_advance, p_win_cup, p_sf, captured_at
+         from dc order by team_id, captured_at desc
+     ),
+     prev_row as (
+       select distinct on (team_id) team_id, p_advance, p_win_cup, p_sf, captured_at
+         from dc, win
+        where dc.captured_at <= win.t_ref
+        order by team_id, captured_at desc
+     )
+     select json_build_object(
+       'window_h', ${MOVERS_WINDOW_H},
+       'from', (select min(captured_at) from prev_row),
+       'to',   (select t_now from win),
+       'teams', coalesce(json_agg(json_build_object(
+                  'team_id', n.team_id,
+                  'p_advance', n.p_advance, 'p_win_cup', n.p_win_cup, 'p_sf', n.p_sf,
+                  'd_advance', n.p_advance - coalesce(p.p_advance, n.p_advance),
+                  'd_win_cup', n.p_win_cup - coalesce(p.p_win_cup, n.p_win_cup),
+                  'team', json_build_object('name', t.name, 'short_name', t.short_name,
+                                            'country_alpha2', t.country_alpha2)
+                ) order by n.p_win_cup desc), '[]'::json)
+     ) as j
+     from now_row n
+     left join prev_row p on p.team_id = n.team_id
+     left join public.team t on t.ss_id = n.team_id`,
+  );
+  return j ?? { window_h: MOVERS_WINDOW_H, from: null, to: null, teams: [] };
+}
+
 async function main(): Promise<void> {
   const generatedAt = new Date().toISOString();
   const core = await exportCore(generatedAt);
@@ -292,6 +349,7 @@ async function main(): Promise<void> {
   const matchSeries = await exportMatchSeries();
   const teamSeries = await exportTeamSeries();
   const calibration = await exportCalibration();
+  const movers = await exportMovers();
 
   const shards: Record<number, Record<string, unknown>> = {};
   for (const [id, j] of Object.entries(events)) {
@@ -306,6 +364,7 @@ async function main(): Promise<void> {
     ...Object.entries(matchSeries).map(([s, j]) => ({ key: `mser:${s}`, value: JSON.stringify(j) })),
     ...Object.entries(teamSeries).map(([id, j]) => ({ key: `tser:${id}`, value: JSON.stringify(j) })),
     { key: 'calib', value: JSON.stringify(calibration) },
+    { key: 'movers', value: JSON.stringify(movers) },
   ];
 
   await mkdir(OUT_DIR, { recursive: true });

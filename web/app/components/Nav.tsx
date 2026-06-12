@@ -27,6 +27,7 @@ export function Nav({ lang, theme, layout }: { lang: Lang; theme: Theme; layout:
     ['/teams', t.teams],
     ['/predictions', t.predictions],
     ['/simulation', t.forecast],
+    ['/movers', t.movers],
     ['/accuracy', t.accuracy],
   ] as const;
 

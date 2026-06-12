@@ -10,7 +10,7 @@ export const LANGS: Lang[] = ['hr', 'en'];
 
 export interface Dict {
   locale: string;
-  nav: { overview: string; fixtures: string; groups: string; teams: string; predictions: string; forecast: string; accuracy: string };
+  nav: { overview: string; fixtures: string; groups: string; teams: string; predictions: string; forecast: string; movers: string; accuracy: string };
   ui: { toDark: string; toLight: string; toWide: string; toBoxed: string };
   common: {
     live: string;
@@ -89,6 +89,18 @@ export interface Dict {
     th: { team: string; grp: string; winGrp: string; advance: string; semis: string; winCup: string };
     note: (iters: string) => string;
   };
+  movers: {
+    title: string;
+    sub: (hours: number) => string;
+    risers: string;
+    fallers: string;
+    quiet: string;
+    metricAdvance: string;
+    metricTitle: string;
+    th: { team: string; grp: string; advance: string; title: string };
+    note: string;
+    empty: string;
+  };
   match: {
     backFixtures: string;
     prediction: string;
@@ -131,7 +143,7 @@ export interface Dict {
 export const T: Record<Lang, Dict> = {
   hr: {
     locale: 'hr-HR',
-    nav: { overview: 'Pregled', fixtures: 'Raspored', groups: 'Skupine', teams: 'Momčadi', predictions: 'Predikcije', forecast: 'Prognoza', accuracy: 'Točnost' },
+    nav: { overview: 'Pregled', fixtures: 'Raspored', groups: 'Skupine', teams: 'Momčadi', predictions: 'Predikcije', forecast: 'Prognoza', movers: 'Pomaci', accuracy: 'Točnost' },
     ui: { toDark: 'Tamna tema', toLight: 'Svijetla tema', toWide: 'Puna širina', toBoxed: 'Sužena širina' },
     common: {
       live: 'UŽIVO',
@@ -214,6 +226,18 @@ export const T: Record<Lang, Dict> = {
       note: (iters) =>
         `Svaki turnir odigran je ${iters} puta: 72 utakmice skupina uzorkuju se iz Dixon-Coles modela golova, rangiraju FIFA-inim pravilima, osam najboljih trećeplasiranih prolazi, a kompletan ždrijeb od 32 momčadi rekonstruira se iz službenih slotova i igra do finala. Stupci za naslov skalirani su prema vodećem.`,
     },
+    movers: {
+      title: 'Najveći pomaci',
+      sub: (h) => `Promjena izgleda u zadnjih ${h} h · kako rezultati pomiču prognozu`,
+      risers: 'Skokovi',
+      fallers: 'Padovi',
+      quiet: 'Mirno — prognoza se gotovo nije pomakla',
+      metricAdvance: 'Prolazak',
+      metricTitle: 'Naslov',
+      th: { team: 'Momčad', grp: 'Sk', advance: 'Prolazak', title: 'Naslov' },
+      note: 'Svaki sat Monte-Carlo simulacija se ponovno vrti na svježim rezultatima. Ovdje je razlika između posljednje prognoze i one od prije 24 sata: zeleno = izgledi rastu, crveno = padaju. Prije početka turnira pomaci su sićušni jer još nema rezultata — tablica oživi čim utakmice krenu.',
+      empty: 'Još nema dovoljno povijesti za usporedbu. Pomaci se pojave nakon nekoliko sati snimaka prognoze.',
+    },
     match: {
       backFixtures: '← Raspored',
       prediction: 'Predikcija',
@@ -258,7 +282,7 @@ export const T: Record<Lang, Dict> = {
   },
   en: {
     locale: 'en-GB',
-    nav: { overview: 'Overview', fixtures: 'Fixtures', groups: 'Groups', teams: 'Teams', predictions: 'Predictions', forecast: 'Forecast', accuracy: 'Accuracy' },
+    nav: { overview: 'Overview', fixtures: 'Fixtures', groups: 'Groups', teams: 'Teams', predictions: 'Predictions', forecast: 'Forecast', movers: 'Movers', accuracy: 'Accuracy' },
     ui: { toDark: 'Dark theme', toLight: 'Light theme', toWide: 'Full width', toBoxed: 'Boxed width' },
     common: {
       live: 'LIVE',
@@ -340,6 +364,18 @@ export const T: Record<Lang, Dict> = {
       th: { team: 'Team', grp: 'Grp', winGrp: 'Win grp', advance: 'Advance', semis: 'Semis', winCup: 'Win cup' },
       note: (iters) =>
         `Each tournament is played out ${iters} times: 72 group matches are sampled from the Dixon-Coles goal model, ranked with FIFA tie-breakers, the eight best third-placed teams qualify, and the full 32-team bracket is reconstructed from the official fixture slots and played to the final. Win-cup bars are scaled to the leader.`,
+    },
+    movers: {
+      title: 'Biggest movers',
+      sub: (h) => `Odds change over the last ${h} h · how results swing the forecast`,
+      risers: 'Risers',
+      fallers: 'Fallers',
+      quiet: 'Quiet — the forecast barely moved',
+      metricAdvance: 'Advance',
+      metricTitle: 'Title',
+      th: { team: 'Team', grp: 'Grp', advance: 'Advance', title: 'Title' },
+      note: 'Every hour the Monte-Carlo simulation refits on fresh results. This is the difference between the latest forecast and the one 24 hours earlier: green = odds rising, red = falling. Before the tournament the moves are tiny because there are no results yet — the table comes alive once matches kick off.',
+      empty: 'Not enough history to compare yet. Movers appear after a few hours of forecast snapshots.',
     },
     match: {
       backFixtures: '← Fixtures',

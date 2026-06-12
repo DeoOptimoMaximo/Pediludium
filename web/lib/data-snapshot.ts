@@ -135,6 +135,11 @@ export async function getCalibration(): Promise<import('./types').Calibration> {
   return ((await kv().get('calib', 'json')) as import('./types').Calibration | null) ?? {};
 }
 
+/** Per-team change in advance / title odds over the recent window (swing chart). */
+export async function getMovers(): Promise<import('./types').Movers | null> {
+  return ((await kv().get('movers', 'json')) as import('./types').Movers | null) ?? null;
+}
+
 export async function getEventDetail(eventId: number): Promise<import('./types').EventDetail | null> {
   const shard = (await kv().get(`evs:${eventId % EVENT_SHARDS}`, 'json')) as Record<
     string,

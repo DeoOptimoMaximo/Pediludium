@@ -236,6 +236,49 @@ export async function getCalibration(): Promise<import('./types').Calibration> {
   return out;
 }
 
+/** Per-team change in advance / title odds over the recent window (swing chart).
+ * Mirrors exportMovers in the fetcher: latest snapshot vs the one nearest WINDOW_H
+ * hours earlier (or the earliest snapshot when history is younger than the window). */
+export async function getMovers(): Promise<import('./types').Movers | null> {
+  const WINDOW_H = 24;
+  const { data, error } = await supa()
+    .from('simulation_history')
+    .select('team_id, captured_at, p_advance, p_win_cup, p_sf, team:team_id(name, short_name, country_alpha2)')
+    .eq('model_version', SIM_MODEL)
+    .order('captured_at', { ascending: true });
+  if (error) throw error;
+  if (!data?.length) return null;
+
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const rows = data as any[];
+  const tNow = rows[rows.length - 1].captured_at as string;
+  const tRefTarget = new Date(new Date(tNow).getTime() - WINDOW_H * 3600_000).toISOString();
+  const earliest = rows[0].captured_at as string;
+  const tRef = tRefTarget < earliest ? earliest : tRefTarget;
+
+  const now = new Map<number, any>();
+  const prev = new Map<number, any>();
+  for (const r of rows) {
+    now.set(r.team_id, r); // last write wins → latest
+    if (r.captured_at <= tRef) prev.set(r.team_id, r); // last ≤ tRef → nearest before
+  }
+
+  const teams = [...now.values()].map((n) => {
+    const p = prev.get(n.team_id);
+    return {
+      team_id: n.team_id,
+      p_advance: n.p_advance,
+      p_win_cup: n.p_win_cup,
+      p_sf: n.p_sf,
+      d_advance: (n.p_advance ?? 0) - (p?.p_advance ?? n.p_advance ?? 0),
+      d_win_cup: (n.p_win_cup ?? 0) - (p?.p_win_cup ?? n.p_win_cup ?? 0),
+      team: n.team,
+    };
+  });
+  teams.sort((a, b) => (b.p_win_cup ?? 0) - (a.p_win_cup ?? 0));
+  return { window_h: WINDOW_H, from: [...prev.values()][0]?.captured_at ?? null, to: tNow, teams };
+}
+
 /** Detail for a single historical event (from team_match raw). Reconstructs home/away. */
 export async function getEventDetail(eventId: number): Promise<import('./types').EventDetail | null> {
   const { data, error } = await supa()

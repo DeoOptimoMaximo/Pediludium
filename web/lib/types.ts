@@ -128,6 +128,23 @@ export interface CalibRow {
 /** model_version → rows ordered by kickoff */
 export type Calibration = Record<string, CalibRow[]>;
 
+/* ── biggest movers: change in advance / title odds over a recent window ───── */
+export interface MoverRow {
+  team_id: number;
+  p_advance: number | null;
+  p_win_cup: number | null;
+  p_sf: number | null;
+  d_advance: number; // signed change vs the window's reference snapshot
+  d_win_cup: number;
+  team: { name: string | null; short_name: string | null; country_alpha2: string | null } | null;
+}
+export interface Movers {
+  window_h: number;
+  from: string | null; // reference snapshot time
+  to: string | null; // latest snapshot time
+  teams: MoverRow[];
+}
+
 // model_version identifiers used across the app (the schema versions predictions/sims)
 export const BASELINE_MODEL = 'baseline-poisson-elo-v1';
 export const DC_MODEL = 'dixon-coles-v1';

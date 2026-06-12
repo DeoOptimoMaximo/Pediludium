@@ -365,3 +365,14 @@ tr.hl-cro td.name { font-weight: 800; }
   .crohead .btn { margin-left: 0 !important; width: 100%; text-align: center; }
   .serieschart svg { height: 104px; }
 }
+
+/* biggest movers (/movers) */
+.movers-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+@media (max-width: 820px) { .movers-grid { grid-template-columns: 1fr; } }
+.movers-h { font-size: .82rem; text-transform: uppercase; letter-spacing: .08em; margin: 8px 4px 2px; }
+.movers-h.up { color: var(--ok, #16a34a); }
+.movers-h.down { color: var(--live); }
+.delta { font-weight: 800; font-variant-numeric: tabular-nums; }
+.delta.up { color: var(--ok, #16a34a); }
+.delta.down { color: var(--live); }
+.delta.flat { color: var(--muted); }
