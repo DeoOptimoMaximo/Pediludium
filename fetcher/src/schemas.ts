@@ -81,3 +81,33 @@ export const StandingsResponseSchema = z.object({
     }),
   ),
 });
+
+/* ── per-match enrichment (docs/02): validate envelopes only, parse details from raw —
+ * these payloads are deep and shift shape between matches (periods, market types…). */
+
+// GET /event/{id}/statistics — periods (ALL/1ST/2ND) of grouped statistic items (incl. xG)
+export const EventStatisticsResponseSchema = z.object({
+  statistics: z.array(z.object({ period: z.string().optional(), groups: z.array(z.unknown()) })),
+});
+
+// GET /event/{id}/lineups — formations, XI + bench, missingPlayers per side
+export const EventLineupsResponseSchema = z.object({
+  confirmed: z.boolean().optional(),
+  home: z.unknown(),
+  away: z.unknown(),
+});
+
+// GET /event/{id}/odds/1/all — bookmaker markets (1X2, O/U, …) with fractional values
+export const EventOddsResponseSchema = z.object({
+  markets: z.array(z.unknown()),
+});
+
+// GET /event/{id}/votes — fan "who will win" counts (vote1 / voteX / vote2)
+export const EventVotesResponseSchema = z.object({
+  vote: z.record(z.unknown()),
+});
+
+// GET /event/{id}/shotmap — every shot with pitch coordinates + per-shot xg/xgot
+export const EventShotmapResponseSchema = z.object({
+  shotmap: z.array(z.unknown()),
+});

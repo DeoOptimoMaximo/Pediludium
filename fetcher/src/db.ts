@@ -330,6 +330,142 @@ export async function upsertSimulation(s: SimulationRow): Promise<void> {
   );
 }
 
+/* ── per-match enrichment (statistics / lineups / odds / votes / shotmap) ──
+ * One row per match, upserted; status_at_fetch tells the enrich job whether the
+ * stored payload is final ('finished') or still worth refetching. */
+
+export interface MatchStatisticsRow {
+  match_id: number;
+  status_at_fetch?: string | null;
+  xg_home?: number | null;
+  xg_away?: number | null;
+  possession_home?: number | null;
+  possession_away?: number | null;
+  shots_home?: number | null;
+  shots_away?: number | null;
+  shots_on_home?: number | null;
+  shots_on_away?: number | null;
+  raw?: unknown;
+}
+
+export async function upsertMatchStatistics(s: MatchStatisticsRow): Promise<void> {
+  await dbQuery(
+    `insert into public.match_statistics
+       (match_id, status_at_fetch, xg_home, xg_away, possession_home, possession_away,
+        shots_home, shots_away, shots_on_home, shots_on_away, raw, fetched_at)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())
+     on conflict (match_id) do update set
+       status_at_fetch=excluded.status_at_fetch,
+       xg_home=excluded.xg_home, xg_away=excluded.xg_away,
+       possession_home=excluded.possession_home, possession_away=excluded.possession_away,
+       shots_home=excluded.shots_home, shots_away=excluded.shots_away,
+       shots_on_home=excluded.shots_on_home, shots_on_away=excluded.shots_on_away,
+       raw=excluded.raw, fetched_at=now()`,
+    [
+      s.match_id,
+      s.status_at_fetch ?? null,
+      s.xg_home ?? null,
+      s.xg_away ?? null,
+      s.possession_home ?? null,
+      s.possession_away ?? null,
+      s.shots_home ?? null,
+      s.shots_away ?? null,
+      s.shots_on_home ?? null,
+      s.shots_on_away ?? null,
+      s.raw ?? null,
+    ],
+  );
+}
+
+export interface MatchLineupsRow {
+  match_id: number;
+  status_at_fetch?: string | null;
+  confirmed?: boolean | null;
+  home_formation?: string | null;
+  away_formation?: string | null;
+  home_missing?: unknown;
+  away_missing?: unknown;
+  raw?: unknown;
+}
+
+export async function upsertMatchLineups(l: MatchLineupsRow): Promise<void> {
+  await dbQuery(
+    `insert into public.match_lineups
+       (match_id, status_at_fetch, confirmed, home_formation, away_formation,
+        home_missing, away_missing, raw, fetched_at)
+     values ($1,$2,$3,$4,$5,$6,$7,$8, now())
+     on conflict (match_id) do update set
+       status_at_fetch=excluded.status_at_fetch, confirmed=excluded.confirmed,
+       home_formation=excluded.home_formation, away_formation=excluded.away_formation,
+       home_missing=excluded.home_missing, away_missing=excluded.away_missing,
+       raw=excluded.raw, fetched_at=now()`,
+    [
+      l.match_id,
+      l.status_at_fetch ?? null,
+      l.confirmed ?? null,
+      l.home_formation ?? null,
+      l.away_formation ?? null,
+      l.home_missing ?? null,
+      l.away_missing ?? null,
+      l.raw ?? null,
+    ],
+  );
+}
+
+export interface MatchOddsRow {
+  match_id: number;
+  status_at_fetch?: string | null;
+  imp_home?: number | null;
+  imp_draw?: number | null;
+  imp_away?: number | null;
+  raw?: unknown;
+}
+
+export async function upsertMatchOdds(o: MatchOddsRow): Promise<void> {
+  await dbQuery(
+    `insert into public.match_odds
+       (match_id, status_at_fetch, imp_home, imp_draw, imp_away, raw, fetched_at)
+     values ($1,$2,$3,$4,$5,$6, now())
+     on conflict (match_id) do update set
+       status_at_fetch=excluded.status_at_fetch,
+       imp_home=excluded.imp_home, imp_draw=excluded.imp_draw, imp_away=excluded.imp_away,
+       raw=excluded.raw, fetched_at=now()`,
+    [o.match_id, o.status_at_fetch ?? null, o.imp_home ?? null, o.imp_draw ?? null, o.imp_away ?? null, o.raw ?? null],
+  );
+}
+
+export interface MatchVotesRow {
+  match_id: number;
+  status_at_fetch?: string | null;
+  votes_home?: number | null;
+  votes_draw?: number | null;
+  votes_away?: number | null;
+  raw?: unknown;
+}
+
+export async function upsertMatchVotes(v: MatchVotesRow): Promise<void> {
+  await dbQuery(
+    `insert into public.match_votes
+       (match_id, status_at_fetch, votes_home, votes_draw, votes_away, raw, fetched_at)
+     values ($1,$2,$3,$4,$5,$6, now())
+     on conflict (match_id) do update set
+       status_at_fetch=excluded.status_at_fetch,
+       votes_home=excluded.votes_home, votes_draw=excluded.votes_draw, votes_away=excluded.votes_away,
+       raw=excluded.raw, fetched_at=now()`,
+    [v.match_id, v.status_at_fetch ?? null, v.votes_home ?? null, v.votes_draw ?? null, v.votes_away ?? null, v.raw ?? null],
+  );
+}
+
+export async function upsertMatchShotmap(matchId: number, statusAtFetch: string | null, raw: unknown): Promise<void> {
+  await dbQuery(
+    `insert into public.match_shotmap (match_id, status_at_fetch, raw, fetched_at)
+     values ($1,$2,$3, now())
+     on conflict (match_id) do update set
+       status_at_fetch=excluded.status_at_fetch, raw=excluded.raw, fetched_at=now()`,
+    [matchId, statusAtFetch, raw ?? null],
+  );
+}
+
 export async function upsertTeamRating(
   teamId: number,
   model: string,

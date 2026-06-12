@@ -12,6 +12,7 @@
     "backfill": "node src/backfill.ts",
     "history": "node src/history.ts",
     "refresh": "node src/refresh.ts",
+    "enrich": "node src/enrich.ts",
     "scheduler": "node src/scheduler.ts",
     "predict": "node src/predict.ts",
     "predict:dc": "node src/dixon-coles.ts",
