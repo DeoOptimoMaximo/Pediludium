@@ -112,6 +112,13 @@ export async function getTeamHistory(id: number): Promise<TeamMatch[]> {
   return ((await kv().get(`hist:${id}`, 'json')) as TeamMatch[] | null) ?? [];
 }
 
+/** All WC2026 matches involving this team (past + future), chronological. */
+export async function getTeamWcMatches(id: number): Promise<WcMatch[]> {
+  return (await getCore()).matches
+    .filter((m) => m.home_team_id === id || m.away_team_id === id)
+    .sort((a, b) => (a.start_ts ?? '').localeCompare(b.start_ts ?? ''));
+}
+
 // must match EVENT_SHARDS / MSER_SHARDS in fetcher/src/export-snapshot.ts
 const EVENT_SHARDS = 64;
 const MSER_SHARDS = 16;

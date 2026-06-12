@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getTeamHistory, getTeamInfo, getTeamSeries, getTeamUpcoming } from '@/lib/data';
+import { getTeamHistory, getTeamInfo, getTeamSeries, getTeamWcMatches } from '@/lib/data';
 import { flag, fmtDay, fmtTime } from '@/lib/format';
 import { groupLabel, resultLetter, teamName } from '@/lib/i18n';
 import { getDict } from '@/lib/lang';
@@ -13,14 +13,20 @@ export const dynamic = 'force-dynamic';
 export default async function TeamPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const teamId = Number(id);
-  const [{ lang, t }, team, history, upcoming, series] = await Promise.all([
+  const [{ lang, t }, team, history, wcMatches, series] = await Promise.all([
     getDict(),
     getTeamInfo(teamId),
     getTeamHistory(teamId),
-    getTeamUpcoming(teamId),
+    getTeamWcMatches(teamId),
     getTeamSeries(teamId),
   ]);
   if (!team) notFound();
+
+  // split this team's WC2026 fixtures: not-yet-finished above the present line,
+  // finished results just below it (newest first) — they live in `match`, not the
+  // historical `team_match` table, so without this they'd vanish once played
+  const upcoming = wcMatches.filter((m) => m.status_type !== 'finished');
+  const wcResults = wcMatches.filter((m) => m.status_type === 'finished').reverse();
 
   const simPts = series?.[SIM_MODEL] ?? [];
   // scale the odds chart to the team's advance probability, not the full 0–100%
@@ -167,6 +173,51 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
         <span className="now">{t.team.present}</span>
         <span className="ln r" />
       </div>
+
+      {/* WC2026 results — finished this tournament (from `match`, newest first) */}
+      {wcResults.length > 0 && (
+        <div>
+          <div className="dayhdr">
+            <h3>{t.team.wcResults}</h3>
+            <span className="muted small">{wcResults.length}</span>
+            <span className="ln" />
+          </div>
+          <div className="card" style={{ padding: '4px 14px' }}>
+            {wcResults.map((m) => {
+              const isHome = m.home_team_id === teamId;
+              const teamScore = isHome ? m.home_score : m.away_score;
+              const oppScore = isHome ? m.away_score : m.home_score;
+              const oppName = isHome ? m.away_name : m.home_name;
+              const oppAlpha2 = isHome ? m.away_alpha2 : m.home_alpha2;
+              const res =
+                teamScore == null || oppScore == null
+                  ? null
+                  : teamScore > oppScore
+                    ? 'W'
+                    : teamScore < oppScore
+                      ? 'L'
+                      : 'D';
+              return (
+                <Link className="hrow" key={m.ss_id} href={`/match/${m.ss_id}`}>
+                  <span className="hdate">{fmtDay(m.start_ts, lang)}</span>
+                  <span className={`res ${res ?? ''}`}>{resultLetter(res, lang)}</span>
+                  <span className="hopp">
+                    <span className="venue">{isHome ? t.common.homeShort : t.common.awayShort}</span>
+                    <span className="flag">{flag(oppAlpha2)}</span>
+                    <span className="nm">{teamName(oppName, oppAlpha2, lang) ?? t.common.tbd}</span>
+                  </span>
+                  <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <span className="hsc">
+                      {teamScore}–{oppScore}
+                    </span>
+                    {m.group_name && <span className="hcomp">{groupLabel(m.group_name, lang)}</span>}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* PAST — historical results grouped by year (newest first) */}
       {[...byYear.entries()].map(([year, ms]) => (

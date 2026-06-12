@@ -75,6 +75,7 @@ export interface Dict {
     historyLoading: string;
     upcoming: string;
     present: string;
+    wcResults: string;
     oddsTimeline: string;
     oddsTimelineNote: string;
   };
@@ -210,6 +211,7 @@ export const T: Record<Lang, Dict> = {
       historyLoading: 'Povijest utakmica još se učitava.',
       upcoming: 'Slijedi',
       present: 'SADA',
+      wcResults: 'Svjetsko prvenstvo 2026 — odigrano',
       oddsTimeline: 'Izgledi kroz vrijeme',
       oddsTimelineNote:
         'Kako se Monte-Carlo prognoza turnira mijenja iz sata u sat kako stižu novi rezultati i model se ponovno trenira. Ravna linija = prognoza se nije mijenjala.',
@@ -349,6 +351,7 @@ export const T: Record<Lang, Dict> = {
       historyLoading: 'Match history is still loading.',
       upcoming: 'Upcoming',
       present: 'PRESENT',
+      wcResults: 'World Cup 2026 — played',
       oddsTimeline: 'Odds over time',
       oddsTimelineNote:
         'How the Monte-Carlo tournament forecast moves hour by hour as new results arrive and the model refits. A flat line means the forecast held steady.',

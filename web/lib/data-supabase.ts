@@ -123,6 +123,17 @@ export async function getTeamUpcoming(id: number): Promise<WcMatch[]> {
   return (data ?? []) as WcMatch[];
 }
 
+/** All WC2026 matches involving this team (past + future), chronological. */
+export async function getTeamWcMatches(id: number): Promise<WcMatch[]> {
+  const { data, error } = await supa()
+    .from('wc2026_match')
+    .select('*')
+    .or(`home_team_id.eq.${id},away_team_id.eq.${id}`)
+    .order('start_ts', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as WcMatch[];
+}
+
 /** A team's historical matches, newest first. */
 export async function getTeamHistory(id: number): Promise<TeamMatch[]> {
   const { data, error } = await supa()

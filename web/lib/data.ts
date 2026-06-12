@@ -22,6 +22,7 @@ export const getRatings = impl.getRatings;
 export const getNationalTeams = impl.getNationalTeams;
 export const getTeamInfo = impl.getTeamInfo;
 export const getTeamUpcoming = impl.getTeamUpcoming;
+export const getTeamWcMatches = impl.getTeamWcMatches;
 export const getTeamHistory = impl.getTeamHistory;
 export const getEventDetail = impl.getEventDetail;
 export const getMatchSeries = impl.getMatchSeries;
