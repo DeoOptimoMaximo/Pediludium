@@ -46,10 +46,10 @@ HOUR=$(date +%H)
 echo "[$(date -u +%FT%TZ)] ===== hourly snapshot tick (local hour $HOUR) ====="
 
 step npm run refresh -- --full
-# enrich (xG/lineups/odds/votes/shotmap) is DISABLED in cron: it still uses direct /api/v1
-# calls which the 2026-06 challenge 403s even via the mobile IP (per-request, not just IP),
-# tripping the breaker and burning the proxy session. Re-enable once enrich is moved to the
-# piggyback match-view harvest (docs/15 validation checklist).
+# enrich now works via the piggyback match-view harvest (lineups/odds/votes), but is left
+# OFF in cron for now: each match view is a ~10-15s SPA navigation, and nothing in the UI
+# consumes match_odds/votes yet (and xG/shotmap still need the Statistics sub-tab, docs/15).
+# Run manually when wanted: SOFA_PROXY_SERVER=... ENRICH_MAX_MATCHES=4 npm run enrich
 # step npm run enrich
 
 # backfill (standings + group tagging) and the nightly history/baseline fetch also use the
@@ -64,6 +64,7 @@ step npm run refresh -- --full
 # fi
 
 # DB-only compute (zero SofaScore calls) + publish to Cloudflare KV/R2
+step npm run standings   # group tables from match results (the /standings endpoint is blocked)
 step npm run predict:dc
 step npm run simulate
 step npm run history:record
