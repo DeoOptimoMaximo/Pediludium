@@ -272,7 +272,7 @@ async function exportCalibration(): Promise<Record<string, unknown[]>> {
     const brier = p.reduce((s, pi, i) => s + (pi - (i === outcome ? 1 : 0)) ** 2, 0);
     const logloss = -Math.log(Math.max(p[outcome]!, 1e-9));
     (out[r.model_version] ??= []).push({
-      match_id: r.match_id,
+      match_id: Number(r.match_id), // node-pg returns bigint as string; keep it a number like core.matches.ss_id
       kickoff: r.start_ts instanceof Date ? r.start_ts.toISOString() : r.start_ts,
       p: p.map((v) => Math.round(v * 10000) / 10000),
       outcome,
