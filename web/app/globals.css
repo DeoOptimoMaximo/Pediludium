@@ -376,3 +376,33 @@ tr.hl-cro td.name { font-weight: 800; }
 .delta.up { color: var(--ok, #16a34a); }
 .delta.down { color: var(--live); }
 .delta.flat { color: var(--muted); }
+
+/* scorecard (/scorecard) */
+.scsummary { display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: baseline; padding: 14px 16px; margin-top: 14px; }
+.scs { display: flex; flex-direction: column; gap: 2px; }
+.scs-lbl { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.scs-legend { width: 100%; }
+.scorerow { display: grid; grid-template-columns: 52px 1fr auto auto; align-items: center; gap: 12px;
+  padding: 8px 4px; border-bottom: 1px solid var(--line); color: var(--text); }
+.scorerow:last-child { border-bottom: none; }
+.scorerow:hover { background: var(--bg-soft); }
+.sc-when { font-variant-numeric: tabular-nums; color: var(--muted); font-size: .82rem; }
+.sc-teams { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; min-width: 0; }
+.sc-h { text-align: right; }
+.sc-a { text-align: left; }
+.sc-score { font-weight: 800; font-variant-numeric: tabular-nums; min-width: 38px; text-align: center; }
+.sc-score .vs { color: var(--muted); font-weight: 400; }
+.pickbadge { display: inline-block; padding: 2px 9px; border-radius: 7px; font-weight: 700; font-size: .8rem;
+  border: 1px solid var(--line); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pickbadge.ok { color: var(--ok, #16a34a); border-color: color-mix(in srgb, var(--ok, #16a34a) 40%, transparent); background: color-mix(in srgb, var(--ok, #16a34a) 9%, transparent); }
+.pickbadge.no { color: var(--live); border-color: color-mix(in srgb, var(--live) 40%, transparent); background: color-mix(in srgb, var(--live) 8%, transparent); }
+.sc-verdict { display: inline-flex; align-items: center; gap: 6px; min-width: 56px; justify-content: flex-end; }
+.verdict { font-weight: 900; }
+.verdict.hit { color: var(--ok, #16a34a); }
+.verdict.miss { color: var(--live); }
+.sc-verdict .actual { font-weight: 700; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .scorerow { grid-template-columns: 40px 1fr auto; }
+  .sc-verdict { grid-column: 2 / 4; justify-content: flex-start; }
+  .sc-teams { font-size: .9rem; }
+}

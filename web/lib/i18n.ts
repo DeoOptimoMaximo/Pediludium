@@ -10,7 +10,7 @@ export const LANGS: Lang[] = ['hr', 'en'];
 
 export interface Dict {
   locale: string;
-  nav: { overview: string; fixtures: string; groups: string; teams: string; predictions: string; forecast: string; movers: string; accuracy: string };
+  nav: { overview: string; fixtures: string; groups: string; teams: string; predictions: string; forecast: string; movers: string; scorecard: string; accuracy: string };
   ui: { toDark: string; toLight: string; toWide: string; toBoxed: string };
   common: {
     live: string;
@@ -102,6 +102,18 @@ export interface Dict {
     note: string;
     empty: string;
   };
+  scorecard: {
+    title: string;
+    sub: string;
+    hits: (h: number, n: number, pct: number) => string;
+    noneYet: string;
+    th: { pred: string; result: string };
+    noPred: string;
+    correct: string;
+    wrong: string;
+    pick: (o: 0 | 1 | 2) => string;
+    note: string;
+  };
   match: {
     backFixtures: string;
     prediction: string;
@@ -144,7 +156,7 @@ export interface Dict {
 export const T: Record<Lang, Dict> = {
   hr: {
     locale: 'hr-HR',
-    nav: { overview: 'Pregled', fixtures: 'Raspored', groups: 'Skupine', teams: 'Momčadi', predictions: 'Predikcije', forecast: 'Prognoza', movers: 'Pomaci', accuracy: 'Točnost' },
+    nav: { overview: 'Pregled', fixtures: 'Raspored', groups: 'Skupine', teams: 'Momčadi', predictions: 'Predikcije', forecast: 'Prognoza', movers: 'Pomaci', scorecard: 'Pogodci', accuracy: 'Točnost' },
     ui: { toDark: 'Tamna tema', toLight: 'Svijetla tema', toWide: 'Puna širina', toBoxed: 'Sužena širina' },
     common: {
       live: 'UŽIVO',
@@ -240,6 +252,18 @@ export const T: Record<Lang, Dict> = {
       note: 'Svaki sat Monte-Carlo simulacija se ponovno vrti na svježim rezultatima. Ovdje je razlika između posljednje prognoze i one od prije 24 sata: zeleno = izgledi rastu, crveno = padaju. Prije početka turnira pomaci su sićušni jer još nema rezultata — tablica oživi čim utakmice krenu.',
       empty: 'Još nema dovoljno povijesti za usporedbu. Pomaci se pojave nakon nekoliko sati snimaka prognoze.',
     },
+    scorecard: {
+      title: 'Pogodci',
+      sub: 'Sve utakmice kronološki. Za odigrane uspoređujemo predikciju zamrznutu prije početka sa stvarnim ishodom (1-X-2).',
+      hits: (h, n, pct) => `pogođeno ${h}/${n} ishoda (${pct}%)`,
+      noneYet: 'Još nema odigranih utakmica za ocjenu. Tablica oživi čim padnu prvi rezultati.',
+      th: { pred: 'Predikcija', result: 'Ishod' },
+      noPred: 'bez predikcije',
+      correct: 'pogođen ishod',
+      wrong: 'promašen ishod',
+      pick: (o) => (o === 0 ? '1' : o === 1 ? 'X' : '2'),
+      note: 'Predikcija = najvjerojatniji ishod (1 domaćin / X neriješeno / 2 gost) iz Dixon-Coles modela, zamrznut na posljednjem satnom izračunu prije početka utakmice. ✓ = model je pogodio klasifikaciju ishoda, ✗ = promašio. Ovo je gruba „pogodak/promašaj" mjera; za kalibraciju vjerojatnosti (Brier / log-loss) vidi Točnost.',
+    },
     match: {
       backFixtures: '← Raspored',
       prediction: 'Predikcija',
@@ -284,7 +308,7 @@ export const T: Record<Lang, Dict> = {
   },
   en: {
     locale: 'en-GB',
-    nav: { overview: 'Overview', fixtures: 'Fixtures', groups: 'Groups', teams: 'Teams', predictions: 'Predictions', forecast: 'Forecast', movers: 'Movers', accuracy: 'Accuracy' },
+    nav: { overview: 'Overview', fixtures: 'Fixtures', groups: 'Groups', teams: 'Teams', predictions: 'Predictions', forecast: 'Forecast', movers: 'Movers', scorecard: 'Scorecard', accuracy: 'Accuracy' },
     ui: { toDark: 'Dark theme', toLight: 'Light theme', toWide: 'Full width', toBoxed: 'Boxed width' },
     common: {
       live: 'LIVE',
@@ -379,6 +403,18 @@ export const T: Record<Lang, Dict> = {
       th: { team: 'Team', grp: 'Grp', advance: 'Advance', title: 'Title' },
       note: 'Every hour the Monte-Carlo simulation refits on fresh results. This is the difference between the latest forecast and the one 24 hours earlier: green = odds rising, red = falling. Before the tournament the moves are tiny because there are no results yet — the table comes alive once matches kick off.',
       empty: 'Not enough history to compare yet. Movers appear after a few hours of forecast snapshots.',
+    },
+    scorecard: {
+      title: 'Scorecard',
+      sub: 'Every match in order. For played matches we compare the prediction frozen before kick-off against the actual outcome (1-X-2).',
+      hits: (h, n, pct) => `${h}/${n} outcomes called (${pct}%)`,
+      noneYet: 'No played matches to score yet. The table comes alive once the first results land.',
+      th: { pred: 'Prediction', result: 'Outcome' },
+      noPred: 'no prediction',
+      correct: 'outcome called',
+      wrong: 'outcome missed',
+      pick: (o) => (o === 0 ? '1' : o === 1 ? 'X' : '2'),
+      note: 'Prediction = the most likely outcome (1 home / X draw / 2 away) from the Dixon-Coles model, frozen at the last hourly recompute before kick-off. ✓ = the model called the outcome class, ✗ = missed. This is a coarse hit/miss measure; for probability calibration (Brier / log-loss) see Accuracy.',
     },
     match: {
       backFixtures: '← Fixtures',
