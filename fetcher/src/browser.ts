@@ -127,22 +127,36 @@ export async function getJson<T>(path: string, schema: z.ZodType<T>): Promise<Fe
 const API_RE = /^https:\/\/(?:www|api)\.sofascore\.com(\/api\/v1\/.+)$/;
 let warmed = false;
 
-/** Land on an allowed entry page once per process so the SPA session is established. */
+/**
+ * Land on an allowed entry page once per process so the SPA session is established.
+ *
+ * The challenge is per-request (a 403 here is often transient), so we retry through the
+ * polite client — but a persistent 403 must NOT abort the run: we log and proceed anyway.
+ * harvestMatchView routes client-side (pushState), which can still slip through, and any
+ * match that yields nothing is simply skipped by the caller, not fatal. Mirrors the
+ * tolerant `harvest()` path that refresh uses successfully.
+ */
 export async function warmEntry(entryPath = '/football'): Promise<void> {
   if (warmed) return;
-  await client.run(async () => {
-    const p = await ensurePage();
-    const resp = await p.goto(`https://www.sofascore.com${entryPath}`, {
-      waitUntil: 'domcontentloaded',
-      timeout: 45_000,
-    });
-    const status = resp?.status() ?? 0;
-    if (status === 403 || status === 429) {
-      throw new RateLimitedError(status, parseRetryAfter(resp?.headers()['retry-after']));
-    }
-    await p.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => undefined);
-    warmed = true;
-  }, `warm ${entryPath}`);
+  try {
+    await client.run(async () => {
+      const p = await ensurePage();
+      const resp = await p.goto(`https://www.sofascore.com${entryPath}`, {
+        waitUntil: 'domcontentloaded',
+        timeout: 45_000,
+      });
+      const status = resp?.status() ?? 0;
+      if (status === 403 || status === 429) {
+        throw new RateLimitedError(status, parseRetryAfter(resp?.headers()['retry-after']));
+      }
+      await p.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => undefined);
+    }, `warm ${entryPath}`);
+  } catch (err) {
+    const name = err instanceof Error ? err.name : 'error';
+    console.warn(`[browser] warm ${entryPath} did not settle (${name}); proceeding to match views anyway`);
+  }
+  // Mark warmed regardless: don't re-hammer the entry page before every match view.
+  warmed = true;
 }
 
 export interface HarvestHit {

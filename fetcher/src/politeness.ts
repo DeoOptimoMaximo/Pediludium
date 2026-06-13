@@ -105,9 +105,12 @@ export class PoliteClient {
           throw new CircuitOpenError(this.circuitReopenAt);
         }
         if (attempt < this.opts.maxRetries) {
-          const backoff =
-            err.retryAfterMs ??
-            jitter(this.opts.backoffMinMs, this.opts.backoffMaxMs) * 2 ** attempt;
+          // Floor the wait at our jittered exponential backoff: a challenge 403 often carries
+          // `Retry-After: 0`, and `0 ?? fallback` is 0 (0 isn't nullish) — which would retry
+          // instantly and trip the breaker in milliseconds. Honor a *longer* server hint, never
+          // a shorter one.
+          const jittered = jitter(this.opts.backoffMinMs, this.opts.backoffMaxMs) * 2 ** attempt;
+          const backoff = Math.max(err.retryAfterMs ?? 0, jittered);
           console.warn(
             `[politeness] ${label} got ${err.status}; backoff ${Math.round(backoff)}ms (attempt ${attempt + 1}/${this.opts.maxRetries})`,
           );

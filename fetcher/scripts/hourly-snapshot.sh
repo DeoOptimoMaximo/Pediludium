@@ -63,11 +63,26 @@ step npm run refresh -- --full
 #   step env SOFA_DELAY_MIN_MS=2500 SOFA_DELAY_MAX_MS=6000 npm run predict
 # fi
 
-# DB-only compute (zero SofaScore calls) + publish to Cloudflare KV/R2
-step npm run standings   # group tables from match results (the /standings endpoint is blocked)
-step npm run predict:dc
-step npm run simulate
-step npm run history:record
-step npm run snapshot
+# Change gate (src/should-publish.ts): the DC fit uses wall-clock time-decay (half-life
+# 540d), so predict:dc → simulate drift a hair EVERY hour even with no match change. That
+# drift flips the 4th decimal of ~50 series shards (tser/mser) → ~50 KV writes/tick × 24 =
+# ~1200/day, over KV's free-tier 1000 writes/day (429 + daily "limit exceeded" email). So we
+# only recompute + publish when match REALITY changed (score/status/schedule), a match is
+# live, or FORCE_PUBLISH=1. Quiet hours now cost 0 KV writes. refresh always ran above (it
+# only writes the local DB — no KV cost — and is what the gate then reads).
+if node src/should-publish.ts check; then
+  # DB-only compute (zero SofaScore calls) + publish to Cloudflare KV/R2
+  step npm run standings   # group tables from match results (the /standings endpoint is blocked)
+  step npm run predict:dc
+  step npm run simulate
+  step npm run history:record   # series gets a point only on real change → meaningful for calibration
+  if npm run snapshot; then
+    node src/should-publish.ts commit || echo "[$(date -u +%FT%TZ)] ⚠ digest commit failed (non-fatal)"
+  else
+    echo "[$(date -u +%FT%TZ)] ⚠ snapshot/publish failed — digest NOT committed, will retry next tick"
+  fi
+else
+  echo "[$(date -u +%FT%TZ)] gate: no material change — skipping recompute/publish (0 KV writes)"
+fi
 
 echo "[$(date -u +%FT%TZ)] ===== tick done ====="
