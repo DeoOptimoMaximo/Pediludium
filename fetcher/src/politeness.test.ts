@@ -47,6 +47,30 @@ describe('PoliteClient', () => {
     expect(calls).toBe(2);
   });
 
+  it('floors the backoff when the server sends Retry-After: 0 (no instant hammer)', async () => {
+    // A challenge 403 often carries Retry-After: 0; the client must still wait its jittered
+    // backoff, not retry instantly (which used to trip the breaker in milliseconds).
+    const client = new PoliteClient({
+      ...fastOpts,
+      delayMinMs: 1,
+      delayMaxMs: 2,
+      backoffMinMs: 40,
+      backoffMaxMs: 50,
+      maxRetries: 2,
+      circuitThreshold: 5,
+    });
+    let calls = 0;
+    const start = Date.now();
+    const result = await client.run(async () => {
+      calls += 1;
+      if (calls < 2) throw new RateLimitedError(429, 0); // server hint: 0ms
+      return 'ok';
+    });
+    expect(result).toBe('ok');
+    expect(calls).toBe(2);
+    expect(Date.now() - start).toBeGreaterThanOrEqual(35); // floored to ~backoffMin, not 0
+  });
+
   it('trips the circuit breaker after threshold consecutive blocks', async () => {
     const client = new PoliteClient({ ...fastOpts, maxRetries: 10 });
     await expect(
