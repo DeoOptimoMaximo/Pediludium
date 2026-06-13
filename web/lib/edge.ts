@@ -128,6 +128,33 @@ export interface ArbLeg {
   stake_frac: number;
 }
 
+/** Polymarket per-selection info for building verify-links + showing the market price. */
+export interface PmQuoteInfo {
+  slug: string | null;
+  price: number | null; // 0..1 (the YES price)
+  odds: number;
+}
+
+/** key `${match_id}:${market}:${selection}` → Polymarket slug/price/odds. */
+export async function getPmIndex(): Promise<Map<string, PmQuoteInfo>> {
+  const { data, error } = await supa()
+    .from('edge_quote')
+    .select('match_id, market, selection, decimal_odds, extra')
+    .eq('venue_id', 'polymarket')
+    .not('match_id', 'is', null);
+  if (error) throw error;
+  const m = new Map<string, PmQuoteInfo>();
+  for (const q of (data ?? []) as (EdgeQuote & { extra: Record<string, unknown> | null })[]) {
+    const ex = q.extra ?? {};
+    m.set(`${q.match_id}:${q.market}:${q.selection}`, {
+      slug: (ex.eventSlug as string) ?? null,
+      price: ex.price != null ? Number(ex.price) : null,
+      odds: q.decimal_odds,
+    });
+  }
+  return m;
+}
+
 /** match_id → team names, for showing fixtures instead of raw ids. */
 export async function getMatchNames(): Promise<Map<number, { home: string; away: string }>> {
   const { data, error } = await supa().from('wc2026_match').select('ss_id, home_name, away_name');

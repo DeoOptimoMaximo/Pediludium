@@ -5,6 +5,7 @@ import {
   getOddsBoard,
   getOpenOpportunities,
   getPaperOrders,
+  getPmIndex,
   getWallet,
   type ArbLeg,
 } from '@/lib/edge';
@@ -13,73 +14,147 @@ import { RealtimeRefresh } from '../components/RealtimeRefresh';
 export const dynamic = 'force-dynamic';
 
 /**
- * Edge dashboard — Web2 (HR books) ↔ Web3 (Polymarket) odds comparison, the live +EV /
- * arbitrage stream, dry-run bot status and the paper-trade ledger. Reads Postgres directly
- * (lib/edge.ts), so it's a local-dev view independent of the public KV snapshot.
+ * Edge dashboard, written for a NON-technical audience: every number is explained, every
+ * row reads as a plain sentence, and external "verify" links open the actual Polymarket
+ * market. Web2 (HR books) ↔ Web3 (Polymarket) odds, +EV / arbitrage, dry-run bot ledger.
+ * Reads Postgres directly (lib/edge.ts) — a local-dev view, independent of the KV snapshot.
  */
 
 const od = (n: number | null | undefined) => (n == null ? '—' : n.toFixed(2));
 const usd = (n: number | null | undefined) => (n == null ? '—' : `$${n.toFixed(2)}`);
+const pct = (n: number | null | undefined) => (n == null ? '—' : `${Math.round(n * 100)}%`);
+
+// short symbol for compact columns
 const sel = (s: string | null) =>
+  s == null ? '' : ({ home: '1', draw: 'X', away: '2', over: 'Over 2.5', under: 'Under 2.5' }[s] ?? s);
+
+// plain-Croatian meaning of a selection
+const selWord = (s: string | null) =>
   s == null
     ? ''
-    : ({ home: '1', draw: 'X', away: '2', over: 'Over 2.5', under: 'Under 2.5' }[s] ?? s);
+    : ({
+        home: 'pobjeda domaćina',
+        draw: 'neriješeno',
+        away: 'pobjeda gosta',
+        over: '3+ gola u utakmici (Over 2.5)',
+        under: '0–2 gola u utakmici (Under 2.5)',
+      }[s] ?? s);
+
+const pmUrl = (slug: string | null | undefined) =>
+  slug ? `https://polymarket.com/event/${slug}` : 'https://polymarket.com';
+
+function Ext({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="link" style={{ whiteSpace: 'nowrap' }}>
+      {children} ↗
+    </a>
+  );
+}
 
 export default async function EdgePage() {
-  const [stats, wallet, opps, orders, board, names] = await Promise.all([
+  const [stats, wallet, opps, orders, board, names, pm] = await Promise.all([
     getEdgeStats().catch(() => ({ quotes: 0, venues: 0 })),
     getWallet().catch(() => null),
     getOpenOpportunities().catch(() => []),
     getPaperOrders().catch(() => []),
     getOddsBoard().catch(() => []),
     getMatchNames().catch(() => new Map<number, { home: string; away: string }>()),
+    getPmIndex().catch(() => new Map()),
   ]);
 
   const ev = opps.filter((o) => o.kind === 'ev');
   const arb = opps.filter((o) => o.kind === 'arb');
-  const fx = (id: number) => {
-    const n = names.get(id);
-    return n ? `${n.home} – ${n.away}` : `#${id}`;
-  };
   const settled = orders.filter((o) => o.status === 'settled');
   const pnl = settled.reduce((s, o) => s + (o.pnl_usd ?? 0), 0);
   const venues = Object.keys(board[0]?.venues ?? { polymarket: 1 });
 
+  const fx = (id: number) => {
+    const n = names.get(id);
+    return n ? `${n.home} – ${n.away}` : `#${id}`;
+  };
+  const pmSlugFor = (matchId: number, market: string, selection: string) =>
+    pm.get(`${matchId}:${market}:${selection}`)?.slug ?? null;
+
   return (
     <main className="container">
       <RealtimeRefresh table="edge_paper_order" />
-      <h1>Edge — Web2 ↔ Web3</h1>
+      <h1>Edge — gdje se naša procjena razlikuje od tržišta</h1>
       <p className="muted">
-        Usporedba hrvatskih kladionica (offchain) i Polymarketa (onchain), +EV / arbitraža
-        protiv našeg <code>dixon-coles-v1</code> modela, te eksperiment automatiziranog
-        otvaranja pozicija u <strong>dry-run</strong> načinu.
+        Uspoređujemo <strong>vlastiti model</strong> (Dixon-Coles, kao na stranici Prognoze) s
+        time kako utakmice cijene <strong>kladionice</strong>: hrvatske (Web2) i kripto-tržište{' '}
+        <strong>Polymarket</strong> (Web3). Kad se procjene jako razilaze, to je potencijalna
+        prilika. <strong>Bot trguje lažnim novcem (dry-run)</strong> — ništa pravo se ne ulaže;
+        ovo je eksperiment da vidimo je li model stvarno dobar prije nego išta riskiramo.
       </p>
 
-      {/* status cards */}
+      {/* ── plain-language legend ───────────────────────────────────────────── */}
+      <h2>Kako čitati ovu stranicu</h2>
       <div className="cards">
         <div className="card">
-          <div className="card-k">Paper wallet</div>
-          <div className="card-v">{usd(wallet?.balance_usd ?? null)}</div>
-          <div className="muted">start {usd(wallet?.starting_usd ?? null)} · realiz. P&amp;L {usd(pnl)}</div>
+          <div className="card-k">Koeficijent (odds)</div>
+          <div className="muted">
+            Koliko platiš za 1€ uloga ako pogodiš. Koef. <strong>2.00</strong> = uloži 1€, dobiješ
+            2€ (čista zarada 1€). Veći koef. = tržište smatra ishod manje vjerojatnim.
+          </div>
         </div>
         <div className="card">
-          <div className="card-k">Prilike (open)</div>
-          <div className="card-v">{ev.length} +EV · {arb.length} arb</div>
-          <div className="muted">{stats.quotes} quotes · {stats.venues} venue(a)</div>
+          <div className="card-k">Vjerojatnost</div>
+          <div className="muted">
+            Koeficijent pretvoren u postotak: <strong>1 ÷ koef.</strong> Koef. 2.00 → 50% šanse. Tako
+            uspoređujemo „što misli model" i „što misli tržište" u istim jedinicama.
+          </div>
         </div>
         <div className="card">
-          <div className="card-k">Bot</div>
-          <div className="card-v">DRY-RUN</div>
-          <div className="muted">{orders.length} simuliranih pozicija</div>
+          <div className="card-k">Value / „+EV"</div>
+          <div className="muted">
+            Kad <strong>naš model daje veću šansu</strong> nego što tržište naplaćuje. Teoretski
+            isplativo — ali samo ako je model u pravu. Veliki postotak = veliko neslaganje (oprez,
+            model još uči).
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-k">Arbitraža</div>
+          <div className="muted">
+            <strong>Zajamčen profit</strong> bez obzira na rezultat: kad su koeficijenti na raznim
+            kladionicama takvi da, ako pokriješ sve ishode, sigurno zaradiš. Rijetko i kratko traje.
+          </div>
         </div>
       </div>
 
-      {/* arbitrage — locked-profit positions across venues */}
-      <h2>Arbitraža (zajamčen profit)</h2>
+      {/* ── status cards ────────────────────────────────────────────────────── */}
+      <h2>Status bota</h2>
+      <div className="cards">
+        <div className="card">
+          <div className="card-k">Lažni novčanik (dry-run)</div>
+          <div className="card-v">{usd(wallet?.balance_usd ?? null)}</div>
+          <div className="muted">
+            početak {usd(wallet?.starting_usd ?? null)} · ostvareni rezultat{' '}
+            <span className={pnl >= 0 ? 'delta up' : 'delta down'}>{usd(pnl)}</span>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-k">Otvorene prilike</div>
+          <div className="card-v">
+            {ev.length} value · {arb.length} arbitraža
+          </div>
+          <div className="muted">
+            iz {stats.quotes} koeficijenata · {stats.venues} kladionica/tržišta
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-k">Način rada</div>
+          <div className="card-v">DRY-RUN</div>
+          <div className="muted">{orders.length} simuliranih oklada — bez pravog novca</div>
+        </div>
+      </div>
+
+      {/* ── arbitrage ───────────────────────────────────────────────────────── */}
+      <h2>Arbitraža — zajamčen profit</h2>
       <p className="muted" style={{ marginTop: -6 }}>
-        Utakmice gdje najbolji koeficijenti po ishodu daju Σ(1/odds) &lt; 1 — pokriješ sve
-        ishode i profitiraš bez obzira na rezultat. Traži ≥2 venue-a; dok je samo Polymarket
-        live, ovih je 0 (pojavit će se kad prorade HR kladionice).
+        Utakmice gdje najbolji koeficijenti po ishodu daju zajamčenu zaradu ako pokriješ sve ishode.
+        Traži <strong>najmanje 2 različita mjesta</strong> (jedno te isto tržište ne daje pravu
+        arbitražu). Dok je uključen samo Polymarket, ovih je <strong>0</strong> — pojavit će se kad
+        priključimo hrvatske kladionice.
       </p>
       <div className="tblwrap">
         <table className="tbl">
@@ -87,8 +162,8 @@ export default async function EdgePage() {
             <tr>
               <th style={{ textAlign: 'left' }}>Utakmica</th>
               <th>Tržište</th>
-              <th>Profit</th>
-              <th style={{ textAlign: 'left' }}>Noge (venue · izbor · odds · ulog%)</th>
+              <th title="Zajamčena zarada ako se ulozi rasporede po nogama">Profit</th>
+              <th style={{ textAlign: 'left' }}>Gdje i kako (klikni za provjeru)</th>
             </tr>
           </thead>
           <tbody>
@@ -97,79 +172,109 @@ export default async function EdgePage() {
               return (
                 <tr key={o.id}>
                   <td style={{ textAlign: 'left' }}>{fx(o.match_id)}</td>
-                  <td>{o.market}</td>
+                  <td>{o.market === '1x2' ? 'Pobjednik' : 'Golovi (2.5)'}</td>
                   <td className="delta up">+{(o.edge * 100).toFixed(2)}%</td>
-                  <td style={{ textAlign: 'left' }} className="muted">
-                    {legs
-                      .map((l) => `${l.venue}·${sel(l.selection)}·${od(l.odds)}·${(l.stake_frac * 100).toFixed(0)}%`)
-                      .join('   |   ')}
+                  <td style={{ textAlign: 'left' }}>
+                    {legs.map((l, i) => {
+                      const slug = l.venue === 'polymarket' ? pmSlugFor(o.match_id, o.market, l.selection) : null;
+                      const label = `${l.venue}: ${selWord(l.selection)} @ ${od(l.odds)} (uloži ${(l.stake_frac * 100).toFixed(0)}%)`;
+                      return (
+                        <span key={i}>
+                          {i > 0 && <span className="muted"> · </span>}
+                          {l.venue === 'polymarket' ? <Ext href={pmUrl(slug)}>{label}</Ext> : <span>{label}</span>}
+                        </span>
+                      );
+                    })}
                   </td>
                 </tr>
               );
             })}
             {arb.length === 0 && (
-              <tr><td colSpan={4} className="muted">Trenutno nema arbitražnih prilika.</td></tr>
+              <tr>
+                <td colSpan={4} className="muted">
+                  Trenutno nema arbitražnih prilika (treba ≥2 tržišta).
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
       </div>
 
-      {/* opportunities */}
-      <h2>+EV prilike (model vs tržište)</h2>
+      {/* ── value / +EV ─────────────────────────────────────────────────────── */}
+      <h2>Value oklade — gdje model vidi priliku</h2>
       <p className="muted" style={{ marginTop: -6 }}>
-        Edge = model_prob × odds − 1. Napomena: veliki edge ≈ neslaganje modela i tržišta;
-        DC model je trenutno overconfident, zato je dry-run pravi test.
+        Redci gdje naš model daje veću šansu nego tržište. Svaki redak je objašnjen rečenicom.{' '}
+        <strong>Oprez:</strong> jako veliki postotak znači da se model i tržište jako ne slažu — a
+        tržište je obično u pravu na velikim koeficijentima, pa to češće znači da model još uči nego
+        da je prilika stvarna. Zato i postoji dry-run.
       </p>
       <div className="tblwrap">
         <table className="tbl">
           <thead>
             <tr>
               <th style={{ textAlign: 'left' }}>Utakmica</th>
-              <th>Tržište</th>
-              <th>Izbor</th>
-              <th>Odds</th>
-              <th>Model</th>
-              <th>Edge</th>
-              <th>Kelly</th>
+              <th style={{ textAlign: 'left' }}>Objašnjenje</th>
+              <th title="Koliko Polymarket plaća za ovaj ishod">Koef.</th>
+              <th title="Naš model: šansa za ovaj ishod">Model</th>
+              <th title="Tržište: šansa za ovaj ishod (1 ÷ koeficijent)">Tržište</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
-            {ev.slice(0, 20).map((o) => (
-              <tr key={o.id}>
-                <td style={{ textAlign: 'left' }}>{fx(o.match_id)}</td>
-                <td>{o.market}</td>
-                <td>{sel(o.selection)}</td>
-                <td>{od(o.decimal_odds)}</td>
-                <td>{o.model_prob == null ? '—' : `${(o.model_prob * 100).toFixed(0)}%`}</td>
-                <td className="delta up">+{(o.edge * 100).toFixed(0)}%</td>
-                <td className="muted">{o.kelly_fraction == null ? '—' : `${(o.kelly_fraction * 100).toFixed(1)}%`}</td>
-              </tr>
-            ))}
+            {ev.slice(0, 20).map((o) => {
+              const marketP = o.decimal_odds ? 1 / o.decimal_odds : null;
+              const slug = pmSlugFor(o.match_id, o.market, o.selection ?? '');
+              return (
+                <tr key={o.id}>
+                  <td style={{ textAlign: 'left' }}>{fx(o.match_id)}</td>
+                  <td style={{ textAlign: 'left' }}>
+                    Model daje <strong>{pct(o.model_prob)}</strong> za <em>{selWord(o.selection)}</em>, a
+                    tržište cijeni na <strong>{pct(marketP)}</strong> (koef. {od(o.decimal_odds)}).
+                  </td>
+                  <td>{od(o.decimal_odds)}</td>
+                  <td className="delta up">{pct(o.model_prob)}</td>
+                  <td className="muted">{pct(marketP)}</td>
+                  <td>
+                    <Ext href={pmUrl(slug)}>Provjeri</Ext>
+                  </td>
+                </tr>
+              );
+            })}
             {ev.length === 0 && (
-              <tr><td colSpan={7} className="muted">Nema otvorenih +EV prilika.</td></tr>
+              <tr>
+                <td colSpan={6} className="muted">
+                  Nema otvorenih value prilika.
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
       </div>
 
-      {/* cross-venue 1x2 board */}
-      <h2>1X2 odds po venue-u</h2>
+      {/* ── cross-venue 1x2 board ───────────────────────────────────────────── */}
+      <h2>Koeficijenti za pobjednika, po tržištu</h2>
+      <p className="muted" style={{ marginTop: -6 }}>
+        <strong>1</strong> = domaćin, <strong>X</strong> = neriješeno, <strong>2</strong> = gost. Niži
+        broj = veća šansa po tom tržištu.
+      </p>
       <div className="tblwrap">
         <table className="tbl">
           <thead>
             <tr>
               <th style={{ textAlign: 'left' }}>Utakmica</th>
               {venues.map((v) => (
-                <th key={v} colSpan={3}>{v}</th>
+                <th key={v} colSpan={3}>
+                  {v}
+                </th>
               ))}
             </tr>
             <tr>
               <th></th>
               {venues.map((v) => (
                 <Fragment key={v}>
-                  <th>1</th>
-                  <th>X</th>
-                  <th>2</th>
+                  <th title="domaćin">1</th>
+                  <th title="neriješeno">X</th>
+                  <th title="gost">2</th>
                 </Fragment>
               ))}
             </tr>
@@ -177,7 +282,17 @@ export default async function EdgePage() {
           <tbody>
             {board.slice(0, 30).map((b) => (
               <tr key={b.match_id}>
-                <td style={{ textAlign: 'left' }}>{b.home_name} – {b.away_name}</td>
+                <td style={{ textAlign: 'left' }}>
+                  {b.venues.polymarket ? (
+                    <Ext href={pmUrl(pmSlugFor(b.match_id, '1x2', 'home'))}>
+                      {b.home_name} – {b.away_name}
+                    </Ext>
+                  ) : (
+                    <>
+                      {b.home_name} – {b.away_name}
+                    </>
+                  )}
+                </td>
                 {venues.map((v) => (
                   <Fragment key={v}>
                     <td>{od(b.venues[v]?.home)}</td>
@@ -191,20 +306,26 @@ export default async function EdgePage() {
         </table>
       </div>
 
-      {/* paper-trade ledger */}
-      <h2>Dnevnik simuliranih trgovina</h2>
+      {/* ── paper-trade ledger ──────────────────────────────────────────────── */}
+      <h2>Dnevnik simuliranih oklada (lažni novac)</h2>
+      <p className="muted" style={{ marginTop: -6 }}>
+        Svaka oklada koju je bot „odigrao" u dry-run načinu. <strong>Ulog</strong> = koliko bi se
+        uložilo · <strong>Traženo → Stvarno</strong> = koeficijent koji smo htjeli i koji bismo
+        realno dobili (razlika je trošak likvidnosti) · <strong>Rezultat</strong> = zarada/gubitak
+        nakon što utakmica završi.
+      </p>
       <div className="tblwrap">
         <table className="tbl">
           <thead>
             <tr>
               <th style={{ textAlign: 'left' }}>Vrijeme</th>
-              <th>Venue</th>
+              <th style={{ textAlign: 'left' }}>Utakmica</th>
               <th>Tržište</th>
               <th>Izbor</th>
               <th>Ulog</th>
-              <th>Req → Fill</th>
+              <th title="Koeficijent koji smo htjeli vs koji bismo realno dobili">Traženo → Stvarno</th>
               <th>Status</th>
-              <th>P&amp;L</th>
+              <th>Rezultat</th>
             </tr>
           </thead>
           <tbody>
@@ -213,23 +334,34 @@ export default async function EdgePage() {
                 <td style={{ textAlign: 'left' }} className="muted">
                   {new Date(o.placed_at).toLocaleString('hr-HR')}
                 </td>
-                <td>{o.venue_id}</td>
-                <td>{o.market}</td>
-                <td>{sel(o.selection)}</td>
+                <td style={{ textAlign: 'left' }}>{o.match_id ? fx(o.match_id) : '—'}</td>
+                <td>{o.market === '1x2' ? 'Pobjednik' : 'Golovi'}</td>
+                <td title={selWord(o.selection)}>{sel(o.selection)}</td>
                 <td>{usd(o.stake_usd)}</td>
-                <td>{od(o.requested_odds)} → {od(o.sim_fill_odds)}</td>
-                <td className="muted">{o.status}</td>
+                <td>
+                  {od(o.requested_odds)} → {od(o.sim_fill_odds)}
+                </td>
+                <td className="muted">{o.status === 'settled' ? 'završeno' : 'čeka rezultat'}</td>
                 <td className={o.pnl_usd == null ? 'muted' : o.pnl_usd >= 0 ? 'delta up' : 'delta down'}>
                   {o.pnl_usd == null ? '—' : usd(o.pnl_usd)}
                 </td>
               </tr>
             ))}
             {orders.length === 0 && (
-              <tr><td colSpan={8} className="muted">Još nema simuliranih trgovina.</td></tr>
+              <tr>
+                <td colSpan={8} className="muted">
+                  Još nema simuliranih oklada.
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      <p className="muted" style={{ marginTop: 24, fontSize: '0.85em' }}>
+        Eksperiment · lažni novac · podaci s Polymarketa (Gamma/CLOB). Vanjske poveznice otvaraju
+        stvarno tržište radi provjere. Hrvatske kladionice se priključuju uskoro.
+      </p>
     </main>
   );
 }

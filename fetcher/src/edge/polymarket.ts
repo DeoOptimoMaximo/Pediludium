@@ -237,7 +237,13 @@ export async function collectPolymarketQuotes(refine = true): Promise<PmEventQuo
           homeName: fm.fixture.homeName,
           awayName: fm.fixture.awayName,
           startTs: e.startDate ?? undefined,
-          extra: { tokenId: token, conditionId: mk.conditionId, price, negRisk: mk.negRisk },
+          extra: {
+            tokenId: token,
+            conditionId: mk.conditionId,
+            price,
+            negRisk: mk.negRisk,
+            eventSlug: e.slug, // → https://polymarket.com/event/<slug> for the verify link
+          },
           raw: { event: e.title, git: mk.groupItemTitle },
         };
         const bucket =
