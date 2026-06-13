@@ -32,6 +32,9 @@ practices.
 | [12-realtime-notes.md](./12-realtime-notes.md) | Realtime end-to-end + REPLICA IDENTITY FULL kvaka |
 | [13-simulation-model.md](./13-simulation-model.md) | Dixon-Coles + Monte-Carlo simulacija turnira (advance/win-cup odds) |
 | [14-public-deploy-and-snapshots.md](./14-public-deploy-and-snapshots.md) | Javni Cloudflare deploy (nogomet.domovina.ai), satni snapshot pipeline, R2 povijest, brand „Lopta je okrugla" + i18n |
+| [15-sofascore-challenge-and-piggyback.md](./15-sofascore-challenge-and-piggyback.md) | Challenge blok + mobilni proxy piggyback transport (harvest SPA odgovora) |
+| [16-edge-web2-web3-trading.md](./16-edge-web2-web3-trading.md) | Edge sloj: Polymarket/kladionice odds, +EV/arbitraža, dry-run bot |
+| [17-the-draw-paradox.md](./17-the-draw-paradox.md) | Zašto nijedna predikcija nije remi — geometrija matrice rezultata; izvor 1. blog posta |
 
 ## Tech stack (dogovoreno)
 

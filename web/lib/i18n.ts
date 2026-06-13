@@ -10,7 +10,8 @@ export const LANGS: Lang[] = ['hr', 'en'];
 
 export interface Dict {
   locale: string;
-  nav: { overview: string; fixtures: string; groups: string; teams: string; predictions: string; forecast: string; movers: string; scorecard: string; accuracy: string };
+  nav: { overview: string; fixtures: string; groups: string; teams: string; predictions: string; forecast: string; movers: string; scorecard: string; accuracy: string; blog: string };
+  blog: { title: string; sub: string; minRead: string; back: string };
   ui: { toDark: string; toLight: string; toWide: string; toBoxed: string };
   common: {
     live: string;
@@ -156,7 +157,13 @@ export interface Dict {
 export const T: Record<Lang, Dict> = {
   hr: {
     locale: 'hr-HR',
-    nav: { overview: 'Pregled', fixtures: 'Raspored', groups: 'Skupine', teams: 'Momčadi', predictions: 'Predikcije', forecast: 'Prognoza', movers: 'Pomaci', scorecard: 'Pogodci', accuracy: 'Točnost' },
+    nav: { overview: 'Pregled', fixtures: 'Raspored', groups: 'Skupine', teams: 'Momčadi', predictions: 'Predikcije', forecast: 'Prognoza', movers: 'Pomaci', scorecard: 'Pogodci', accuracy: 'Točnost', blog: 'Blog' },
+    blog: {
+      title: 'Blog — tehničke analize',
+      sub: 'Kako model zapravo računa. Otvorene, matematički potkrijepljene analize iza svake predikcije i izgleda turnira.',
+      minRead: 'min čitanja',
+      back: 'Natrag na blog',
+    },
     ui: { toDark: 'Tamna tema', toLight: 'Svijetla tema', toWide: 'Puna širina', toBoxed: 'Sužena širina' },
     common: {
       live: 'UŽIVO',
@@ -308,7 +315,13 @@ export const T: Record<Lang, Dict> = {
   },
   en: {
     locale: 'en-GB',
-    nav: { overview: 'Overview', fixtures: 'Fixtures', groups: 'Groups', teams: 'Teams', predictions: 'Predictions', forecast: 'Forecast', movers: 'Movers', scorecard: 'Scorecard', accuracy: 'Accuracy' },
+    nav: { overview: 'Overview', fixtures: 'Fixtures', groups: 'Groups', teams: 'Teams', predictions: 'Predictions', forecast: 'Forecast', movers: 'Movers', scorecard: 'Scorecard', accuracy: 'Accuracy', blog: 'Blog' },
+    blog: {
+      title: 'Blog — technical write-ups',
+      sub: 'How the model actually computes. Open, math-backed analyses behind every prediction and tournament odd.',
+      minRead: 'min read',
+      back: 'Back to blog',
+    },
     ui: { toDark: 'Dark theme', toLight: 'Light theme', toWide: 'Full width', toBoxed: 'Boxed width' },
     common: {
       live: 'LIVE',
