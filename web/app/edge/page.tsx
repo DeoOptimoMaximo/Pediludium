@@ -43,6 +43,17 @@ const selWord = (s: string | null) =>
 const pmUrl = (slug: string | null | undefined) =>
   slug ? `https://polymarket.com/event/${slug}` : 'https://polymarket.com';
 
+// card label / value typography (the .card-k/.card-v classes aren't in globals.css)
+const kStyle: React.CSSProperties = {
+  fontSize: '.78rem',
+  textTransform: 'uppercase',
+  letterSpacing: '.06em',
+  opacity: 0.65,
+  fontWeight: 600,
+  marginBottom: 6,
+};
+const vStyle: React.CSSProperties = { fontSize: '1.5rem', fontWeight: 700, marginBottom: 4 };
+
 function Ext({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" className="link" style={{ whiteSpace: 'nowrap' }}>
@@ -89,23 +100,23 @@ export default async function EdgePage() {
 
       {/* ── plain-language legend ───────────────────────────────────────────── */}
       <h2>Kako čitati ovu stranicu</h2>
-      <div className="cards">
+      <div className="grid cols-2">
         <div className="card">
-          <div className="card-k">Koeficijent (odds)</div>
+          <div style={kStyle}>Koeficijent (odds)</div>
           <div className="muted">
             Koliko platiš za 1€ uloga ako pogodiš. Koef. <strong>2.00</strong> = uloži 1€, dobiješ
             2€ (čista zarada 1€). Veći koef. = tržište smatra ishod manje vjerojatnim.
           </div>
         </div>
         <div className="card">
-          <div className="card-k">Vjerojatnost</div>
+          <div style={kStyle}>Vjerojatnost</div>
           <div className="muted">
             Koeficijent pretvoren u postotak: <strong>1 ÷ koef.</strong> Koef. 2.00 → 50% šanse. Tako
             uspoređujemo „što misli model" i „što misli tržište" u istim jedinicama.
           </div>
         </div>
         <div className="card">
-          <div className="card-k">Value / „+EV"</div>
+          <div style={kStyle}>Value / „+EV"</div>
           <div className="muted">
             Kad <strong>naš model daje veću šansu</strong> nego što tržište naplaćuje. Teoretski
             isplativo — ali samo ako je model u pravu. Veliki postotak = veliko neslaganje (oprez,
@@ -113,7 +124,7 @@ export default async function EdgePage() {
           </div>
         </div>
         <div className="card">
-          <div className="card-k">Arbitraža</div>
+          <div style={kStyle}>Arbitraža</div>
           <div className="muted">
             <strong>Zajamčen profit</strong> bez obzira na rezultat: kad su koeficijenti na raznim
             kladionicama takvi da, ako pokriješ sve ishode, sigurno zaradiš. Rijetko i kratko traje.
@@ -123,18 +134,18 @@ export default async function EdgePage() {
 
       {/* ── status cards ────────────────────────────────────────────────────── */}
       <h2>Status bota</h2>
-      <div className="cards">
+      <div className="grid cols-3">
         <div className="card">
-          <div className="card-k">Lažni novčanik (dry-run)</div>
-          <div className="card-v">{usd(wallet?.balance_usd ?? null)}</div>
+          <div style={kStyle}>Lažni novčanik (dry-run)</div>
+          <div style={vStyle}>{usd(wallet?.balance_usd ?? null)}</div>
           <div className="muted">
             početak {usd(wallet?.starting_usd ?? null)} · ostvareni rezultat{' '}
             <span className={pnl >= 0 ? 'delta up' : 'delta down'}>{usd(pnl)}</span>
           </div>
         </div>
         <div className="card">
-          <div className="card-k">Otvorene prilike</div>
-          <div className="card-v">
+          <div style={kStyle}>Otvorene prilike</div>
+          <div style={vStyle}>
             {ev.length} value · {arb.length} arbitraža
           </div>
           <div className="muted">
@@ -142,8 +153,8 @@ export default async function EdgePage() {
           </div>
         </div>
         <div className="card">
-          <div className="card-k">Način rada</div>
-          <div className="card-v">DRY-RUN</div>
+          <div style={kStyle}>Način rada</div>
+          <div style={vStyle}>DRY-RUN</div>
           <div className="muted">{orders.length} simuliranih oklada — bez pravog novca</div>
         </div>
       </div>
