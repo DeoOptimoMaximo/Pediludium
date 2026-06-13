@@ -341,6 +341,60 @@ async function exportMovers(): Promise<{ window_h: number; from: string | null; 
   return j ?? { window_h: MOVERS_WINDOW_H, from: null, to: null, teams: [] };
 }
 
+/**
+ * Edge layer (Web2↔Web3 odds + +EV/arb + dry-run trades) for the public /edge page. One
+ * small KV blob `edge` holding exactly what the page renders. Aggregated in SQL so bigint
+ * ids arrive as JSON numbers. Empty tables → empty arrays (page degrades gracefully).
+ */
+async function exportEdge(generatedAt: string): Promise<Record<string, unknown>> {
+  const opportunities = await jsonOne<unknown[]>(
+    `select coalesce(json_agg(to_jsonb(o) order by o.edge desc), '[]'::json) as j from (
+       select id, kind, match_id, market, selection, venue_id, decimal_odds, model_prob,
+              edge, kelly_fraction, legs, detected_at
+         from public.edge_opportunity where status='open') o`,
+  );
+  const orders = await jsonOne<unknown[]>(
+    `select coalesce(json_agg(to_jsonb(o) order by o.placed_at desc), '[]'::json) as j from (
+       select id, venue_id, match_id, market, selection, requested_odds, stake_usd,
+              sim_fill_odds, sim_slippage, dry_run, status, pnl_usd, placed_at
+         from public.edge_paper_order order by placed_at desc limit 25) o`,
+  );
+  const wallet = await jsonOne<unknown | null>(
+    `select coalesce((select to_jsonb(w) from (
+       select id, kind, balance_usd, starting_usd, currency
+         from public.edge_wallet where id='paper') w), 'null'::jsonb) as j`,
+  );
+  const board = await jsonOne<unknown[]>(
+    `select coalesce(json_agg(to_jsonb(b) order by b.home_name), '[]'::json) as j from (
+       select match_id, max(home_name) as home_name, max(away_name) as away_name,
+              json_object_agg(venue_id, sel) as venues
+         from (
+           select match_id, venue_id, max(home_name) as home_name, max(away_name) as away_name,
+                  json_object_agg(selection, decimal_odds) as sel
+             from public.edge_quote
+            where market='1x2' and match_id is not null
+            group by match_id, venue_id
+         ) per_venue
+        group by match_id) b`,
+  );
+  const pm = await jsonOne<Record<string, unknown>>(
+    `select coalesce(json_object_agg(match_id || ':' || market || ':' || selection,
+              json_build_object('slug', extra->>'eventSlug',
+                'price', (extra->>'price')::float8, 'odds', decimal_odds)), '{}'::json) as j
+       from public.edge_quote where venue_id='polymarket' and match_id is not null`,
+  );
+  const names = await jsonOne<Record<string, unknown>>(
+    `select coalesce(json_object_agg(ss_id::text,
+              json_build_object('home', home_name, 'away', away_name)), '{}'::json) as j
+       from public.wc2026_match where home_name is not null and away_name is not null`,
+  );
+  const stats = await jsonOne<{ quotes: number; venues: number }>(
+    `select json_build_object('quotes', count(*), 'venues', count(distinct venue_id)) as j
+       from public.edge_quote`,
+  );
+  return { generated_at: generatedAt, stats, wallet, opportunities, orders, board, pm, names };
+}
+
 async function main(): Promise<void> {
   const generatedAt = new Date().toISOString();
   const core = await exportCore(generatedAt);
@@ -350,6 +404,7 @@ async function main(): Promise<void> {
   const teamSeries = await exportTeamSeries();
   const calibration = await exportCalibration();
   const movers = await exportMovers();
+  const edge = await exportEdge(generatedAt);
 
   const shards: Record<number, Record<string, unknown>> = {};
   for (const [id, j] of Object.entries(events)) {
@@ -365,6 +420,7 @@ async function main(): Promise<void> {
     ...Object.entries(teamSeries).map(([id, j]) => ({ key: `tser:${id}`, value: JSON.stringify(j) })),
     { key: 'calib', value: JSON.stringify(calibration) },
     { key: 'movers', value: JSON.stringify(movers) },
+    { key: 'edge', value: JSON.stringify(edge) },
   ];
 
   await mkdir(OUT_DIR, { recursive: true });
