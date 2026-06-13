@@ -30,6 +30,7 @@ export function Nav({ lang, theme, layout }: { lang: Lang; theme: Theme; layout:
     ['/movers', t.movers],
     ['/scorecard', t.scorecard],
     ['/accuracy', t.accuracy],
+    ['/edge', 'Edge'],
   ] as const;
 
   const setLang = (l: Lang) => {
