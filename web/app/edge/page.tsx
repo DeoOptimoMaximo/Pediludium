@@ -43,6 +43,7 @@ const selWord = (s: string | null) =>
 const venueFallback: Record<string, string> = {
   polymarket: 'https://polymarket.com',
   kalshi: 'https://kalshi.com/markets/kxwcgame',
+  supersport: 'https://www.supersport.hr/sport',
 };
 
 // card label / value typography (the .card-k/.card-v classes aren't in globals.css)
@@ -82,9 +83,10 @@ export default async function EdgePage() {
 
   // venue columns: known venues first (stable order), then any others actually present
   const present = new Set(board.flatMap((b) => Object.keys(b.venues)));
-  const venues = ['polymarket', 'kalshi']
+  const known = ['polymarket', 'kalshi', 'supersport'];
+  const venues = known
     .filter((v) => present.has(v))
-    .concat([...present].filter((v) => v !== 'polymarket' && v !== 'kalshi'));
+    .concat([...present].filter((v) => !known.includes(v)));
   if (venues.length === 0) venues.push('polymarket');
 
   const fx = (id: number) => {

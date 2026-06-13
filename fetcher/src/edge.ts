@@ -2,6 +2,7 @@ import { closeDb } from './db.ts';
 import { config } from './config.ts';
 import { collectPolymarketQuotes } from './edge/polymarket.ts';
 import { collectKalshiQuotes } from './edge/kalshi.ts';
+import { collectSupersportQuotes } from './edge/supersport.ts';
 import { upsertQuote, ensureWallet } from './edge/db.ts';
 import { scan } from './edge/engine.ts';
 import { runPaperTrades, settlePaperTrades } from './edge/paper-trade.ts';
@@ -35,6 +36,14 @@ async function main(): Promise<void> {
     let n = 0;
     for (const ev of events) for (const q of ev.quotes) (await upsertQuote(q, ev.fixtureMatchId), n++);
     console.log(`[edge] kalshi: ${n} quotes / ${events.length} matched events`);
+  });
+
+  await step('supersport', async () => {
+    // Web2 book over the proxied Chrome/WS — yields 0 gracefully when the proxy is asleep.
+    const events = await collectSupersportQuotes();
+    let n = 0;
+    for (const ev of events) for (const q of ev.quotes) (await upsertQuote(q, ev.fixtureMatchId), n++);
+    console.log(`[edge] supersport: ${n} quotes / ${events.length} matched events`);
   });
 
   await step('scan', async () => {
