@@ -242,7 +242,8 @@ export async function collectPolymarketQuotes(refine = true): Promise<PmEventQuo
             conditionId: mk.conditionId,
             price,
             negRisk: mk.negRisk,
-            eventSlug: e.slug, // → https://polymarket.com/event/<slug> for the verify link
+            eventSlug: e.slug,
+            url: e.slug ? `https://polymarket.com/event/${e.slug}` : 'https://polymarket.com',
           },
           raw: { event: e.title, git: mk.groupItemTitle },
         };

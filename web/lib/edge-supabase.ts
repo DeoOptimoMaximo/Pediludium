@@ -6,7 +6,6 @@ import type {
   EdgeStats,
   EdgeWallet,
   MatchOddsBoard,
-  PmQuoteInfo,
 } from './edge-types';
 
 /**
@@ -41,22 +40,17 @@ export async function getWallet(): Promise<EdgeWallet | null> {
   return (data as EdgeWallet) ?? null;
 }
 
-/** key `${match_id}:${market}:${selection}` → Polymarket slug/price/odds. */
-export async function getPmIndex(): Promise<Map<string, PmQuoteInfo>> {
+/** key `${venue_id}:${match_id}` → external market URL (verify link), any venue. */
+export async function getVenueLinks(): Promise<Map<string, string>> {
   const { data, error } = await supa()
     .from('edge_quote')
-    .select('match_id, market, selection, decimal_odds, extra')
-    .eq('venue_id', 'polymarket')
+    .select('venue_id, match_id, extra')
     .not('match_id', 'is', null);
   if (error) throw error;
-  const m = new Map<string, PmQuoteInfo>();
-  for (const q of (data ?? []) as (EdgeQuote & { extra: Record<string, unknown> | null })[]) {
-    const ex = q.extra ?? {};
-    m.set(`${q.match_id}:${q.market}:${q.selection}`, {
-      slug: (ex.eventSlug as string) ?? null,
-      price: ex.price != null ? Number(ex.price) : null,
-      odds: q.decimal_odds,
-    });
+  const m = new Map<string, string>();
+  for (const q of (data ?? []) as { venue_id: string; match_id: number; extra: Record<string, unknown> | null }[]) {
+    const url = q.extra?.url as string | undefined;
+    if (url) m.set(`${q.venue_id}:${q.match_id}`, url);
   }
   return m;
 }

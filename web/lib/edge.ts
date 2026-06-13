@@ -17,7 +17,7 @@ export const getOpenOpportunities = impl.getOpenOpportunities;
 export const getPaperOrders = impl.getPaperOrders;
 export const getOddsBoard = impl.getOddsBoard;
 export const getMatchNames = impl.getMatchNames;
-export const getPmIndex = impl.getPmIndex;
+export const getVenueLinks = impl.getVenueLinks;
 
 export type {
   EdgeQuote,

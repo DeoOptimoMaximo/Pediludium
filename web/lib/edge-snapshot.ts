@@ -5,7 +5,6 @@ import type {
   EdgeStats,
   EdgeWallet,
   MatchOddsBoard,
-  PmQuoteInfo,
 } from './edge-types';
 
 /**
@@ -22,7 +21,7 @@ interface EdgeBlob {
   opportunities: EdgeOpportunity[];
   orders: EdgePaperOrder[];
   board: MatchOddsBoard[];
-  pm: Record<string, PmQuoteInfo>;
+  links: Record<string, string>;
   names: Record<string, { home: string; away: string }>;
 }
 
@@ -33,7 +32,7 @@ const EMPTY: EdgeBlob = {
   opportunities: [],
   orders: [],
   board: [],
-  pm: {},
+  links: {},
   names: {},
 };
 
@@ -89,7 +88,7 @@ export async function getMatchNames(): Promise<Map<number, { home: string; away:
   return new Map(Object.entries(e.names).map(([k, v]) => [Number(k), v]));
 }
 
-export async function getPmIndex(): Promise<Map<string, PmQuoteInfo>> {
+export async function getVenueLinks(): Promise<Map<string, string>> {
   const e = await getEdge();
-  return new Map(Object.entries(e.pm));
+  return new Map(Object.entries(e.links));
 }

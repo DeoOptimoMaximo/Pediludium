@@ -5,7 +5,7 @@ import {
   getOddsBoard,
   getOpenOpportunities,
   getPaperOrders,
-  getPmIndex,
+  getVenueLinks,
   getWallet,
   type ArbLeg,
 } from '@/lib/edge';
@@ -40,8 +40,10 @@ const selWord = (s: string | null) =>
         under: '0–2 gola u utakmici (Under 2.5)',
       }[s] ?? s);
 
-const pmUrl = (slug: string | null | undefined) =>
-  slug ? `https://polymarket.com/event/${slug}` : 'https://polymarket.com';
+const venueFallback: Record<string, string> = {
+  polymarket: 'https://polymarket.com',
+  kalshi: 'https://kalshi.com/markets/kxwcgame',
+};
 
 // card label / value typography (the .card-k/.card-v classes aren't in globals.css)
 const kStyle: React.CSSProperties = {
@@ -63,28 +65,34 @@ function Ext({ href, children }: { href: string; children: React.ReactNode }) {
 }
 
 export default async function EdgePage() {
-  const [stats, wallet, opps, orders, board, names, pm] = await Promise.all([
+  const [stats, wallet, opps, orders, board, names, links] = await Promise.all([
     getEdgeStats().catch(() => ({ quotes: 0, venues: 0 })),
     getWallet().catch(() => null),
     getOpenOpportunities().catch(() => []),
     getPaperOrders().catch(() => []),
     getOddsBoard().catch(() => []),
     getMatchNames().catch(() => new Map<number, { home: string; away: string }>()),
-    getPmIndex().catch(() => new Map()),
+    getVenueLinks().catch(() => new Map<string, string>()),
   ]);
 
   const ev = opps.filter((o) => o.kind === 'ev');
   const arb = opps.filter((o) => o.kind === 'arb');
   const settled = orders.filter((o) => o.status === 'settled');
   const pnl = settled.reduce((s, o) => s + (o.pnl_usd ?? 0), 0);
-  const venues = Object.keys(board[0]?.venues ?? { polymarket: 1 });
+
+  // venue columns: known venues first (stable order), then any others actually present
+  const present = new Set(board.flatMap((b) => Object.keys(b.venues)));
+  const venues = ['polymarket', 'kalshi']
+    .filter((v) => present.has(v))
+    .concat([...present].filter((v) => v !== 'polymarket' && v !== 'kalshi'));
+  if (venues.length === 0) venues.push('polymarket');
 
   const fx = (id: number) => {
     const n = names.get(id);
     return n ? `${n.home} – ${n.away}` : `#${id}`;
   };
-  const pmSlugFor = (matchId: number, market: string, selection: string) =>
-    pm.get(`${matchId}:${market}:${selection}`)?.slug ?? null;
+  const venueUrl = (venue: string, matchId: number) =>
+    links.get(`${venue}:${matchId}`) ?? venueFallback[venue] ?? '#';
 
   return (
     <main className="container">
@@ -92,10 +100,12 @@ export default async function EdgePage() {
       <h1>Edge — gdje se naša procjena razlikuje od tržišta</h1>
       <p className="muted">
         Uspoređujemo <strong>vlastiti model</strong> (Dixon-Coles, kao na stranici Prognoze) s
-        time kako utakmice cijene <strong>kladionice</strong>: hrvatske (Web2) i kripto-tržište{' '}
-        <strong>Polymarket</strong> (Web3). Kad se procjene jako razilaze, to je potencijalna
-        prilika. <strong>Bot trguje lažnim novcem (dry-run)</strong> — ništa pravo se ne ulaže;
+        time kako utakmice cijene <strong>tržišta predikcija</strong>: <strong>Polymarket</strong>{' '}
+        (kripto/Web3) i <strong>Kalshi</strong> (regulirana američka burza). Kad se procjene jako
+        razilaze, to je potencijalna prilika; kad se dva tržišta razilaze međusobno, moguća je
+        arbitraža. <strong>Bot trguje lažnim novcem (dry-run)</strong> — ništa pravo se ne ulaže;
         ovo je eksperiment da vidimo je li model stvarno dobar prije nego išta riskiramo.
+        (Hrvatske kladionice — SuperSport, PSK, Favbet, Germania, CroBet — priključujemo uskoro.)
       </p>
 
       {/* ── plain-language legend ───────────────────────────────────────────── */}
@@ -162,10 +172,10 @@ export default async function EdgePage() {
       {/* ── arbitrage ───────────────────────────────────────────────────────── */}
       <h2>Arbitraža — zajamčen profit</h2>
       <p className="muted" style={{ marginTop: -6 }}>
-        Utakmice gdje najbolji koeficijenti po ishodu daju zajamčenu zaradu ako pokriješ sve ishode.
-        Traži <strong>najmanje 2 različita mjesta</strong> (jedno te isto tržište ne daje pravu
-        arbitražu). Dok je uključen samo Polymarket, ovih je <strong>0</strong> — pojavit će se kad
-        priključimo hrvatske kladionice.
+        Utakmice gdje najbolji koeficijenti po ishodu (preko Polymarketa i Kalshija) daju zajamčenu
+        zaradu ako pokriješ sve ishode. Klikni nogu za provjeru na tržištu.{' '}
+        <strong>Oprez:</strong> Kalshi WC marketi su često tanki (cijena iz zadnje transakcije, ne
+        live ponude) pa izvršivost zna varirati — detekcija je točna, ali provjeri likvidnost.
       </p>
       <div className="tblwrap">
         <table className="tbl">
@@ -187,12 +197,11 @@ export default async function EdgePage() {
                   <td className="delta up">+{(o.edge * 100).toFixed(2)}%</td>
                   <td style={{ textAlign: 'left' }}>
                     {legs.map((l, i) => {
-                      const slug = l.venue === 'polymarket' ? pmSlugFor(o.match_id, o.market, l.selection) : null;
                       const label = `${l.venue}: ${selWord(l.selection)} @ ${od(l.odds)} (uloži ${(l.stake_frac * 100).toFixed(0)}%)`;
                       return (
                         <span key={i}>
                           {i > 0 && <span className="muted"> · </span>}
-                          {l.venue === 'polymarket' ? <Ext href={pmUrl(slug)}>{label}</Ext> : <span>{label}</span>}
+                          <Ext href={venueUrl(l.venue, o.match_id)}>{label}</Ext>
                         </span>
                       );
                     })}
@@ -234,19 +243,19 @@ export default async function EdgePage() {
           <tbody>
             {ev.slice(0, 20).map((o) => {
               const marketP = o.decimal_odds ? 1 / o.decimal_odds : null;
-              const slug = pmSlugFor(o.match_id, o.market, o.selection ?? '');
               return (
                 <tr key={o.id}>
                   <td style={{ textAlign: 'left' }}>{fx(o.match_id)}</td>
                   <td style={{ textAlign: 'left' }}>
-                    Model daje <strong>{pct(o.model_prob)}</strong> za <em>{selWord(o.selection)}</em>, a
-                    tržište cijeni na <strong>{pct(marketP)}</strong> (koef. {od(o.decimal_odds)}).
+                    Model daje <strong>{pct(o.model_prob)}</strong> za <em>{selWord(o.selection)}</em>, a{' '}
+                    {o.venue_id ?? 'tržište'} ga cijeni na <strong>{pct(marketP)}</strong> (koef.{' '}
+                    {od(o.decimal_odds)}).
                   </td>
                   <td>{od(o.decimal_odds)}</td>
                   <td className="delta up">{pct(o.model_prob)}</td>
                   <td className="muted">{pct(marketP)}</td>
                   <td>
-                    <Ext href={pmUrl(slug)}>Provjeri</Ext>
+                    <Ext href={venueUrl(o.venue_id ?? 'polymarket', o.match_id)}>Provjeri</Ext>
                   </td>
                 </tr>
               );
@@ -294,8 +303,14 @@ export default async function EdgePage() {
             {board.slice(0, 30).map((b) => (
               <tr key={b.match_id}>
                 <td style={{ textAlign: 'left' }}>
-                  {b.venues.polymarket ? (
-                    <Ext href={pmUrl(pmSlugFor(b.match_id, '1x2', 'home'))}>
+                  {links.get(`polymarket:${b.match_id}`) ?? links.get(`kalshi:${b.match_id}`) ? (
+                    <Ext
+                      href={
+                        links.get(`polymarket:${b.match_id}`) ??
+                        links.get(`kalshi:${b.match_id}`) ??
+                        '#'
+                      }
+                    >
                       {b.home_name} – {b.away_name}
                     </Ext>
                   ) : (

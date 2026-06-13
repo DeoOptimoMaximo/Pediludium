@@ -1,6 +1,7 @@
 import { closeDb } from './db.ts';
 import { config } from './config.ts';
 import { collectPolymarketQuotes } from './edge/polymarket.ts';
+import { collectKalshiQuotes } from './edge/kalshi.ts';
 import { upsertQuote, ensureWallet } from './edge/db.ts';
 import { scan } from './edge/engine.ts';
 import { runPaperTrades, settlePaperTrades } from './edge/paper-trade.ts';
@@ -27,6 +28,13 @@ async function main(): Promise<void> {
     let n = 0;
     for (const ev of events) for (const q of ev.quotes) (await upsertQuote(q, ev.fixtureMatchId), n++);
     console.log(`[edge] polymarket: ${n} quotes / ${events.length} matched events`);
+  });
+
+  await step('kalshi', async () => {
+    const events = await collectKalshiQuotes();
+    let n = 0;
+    for (const ev of events) for (const q of ev.quotes) (await upsertQuote(q, ev.fixtureMatchId), n++);
+    console.log(`[edge] kalshi: ${n} quotes / ${events.length} matched events`);
   });
 
   await step('scan', async () => {

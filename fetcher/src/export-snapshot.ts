@@ -377,11 +377,13 @@ async function exportEdge(generatedAt: string): Promise<Record<string, unknown>>
          ) per_venue
         group by match_id) b`,
   );
-  const pm = await jsonOne<Record<string, unknown>>(
-    `select coalesce(json_object_agg(match_id || ':' || market || ':' || selection,
-              json_build_object('slug', extra->>'eventSlug',
-                'price', (extra->>'price')::float8, 'odds', decimal_odds)), '{}'::json) as j
-       from public.edge_quote where venue_id='polymarket' and match_id is not null`,
+  // venue verify-links: `${venue_id}:${match_id}` → external market URL (any venue)
+  const links = await jsonOne<Record<string, unknown>>(
+    `select coalesce(json_object_agg(k, url), '{}'::json) as j from (
+       select venue_id || ':' || match_id as k, max(extra->>'url') as url
+         from public.edge_quote
+        where match_id is not null and extra->>'url' is not null
+        group by venue_id, match_id) z`,
   );
   const names = await jsonOne<Record<string, unknown>>(
     `select coalesce(json_object_agg(ss_id::text,
@@ -392,7 +394,7 @@ async function exportEdge(generatedAt: string): Promise<Record<string, unknown>>
     `select json_build_object('quotes', count(*), 'venues', count(distinct venue_id)) as j
        from public.edge_quote`,
   );
-  return { generated_at: generatedAt, stats, wallet, opportunities, orders, board, pm, names };
+  return { generated_at: generatedAt, stats, wallet, opportunities, orders, board, links, names };
 }
 
 async function main(): Promise<void> {
