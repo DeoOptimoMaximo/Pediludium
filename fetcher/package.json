@@ -33,7 +33,8 @@
     "test:watch": "vitest",
     "format": "prettier --write .",
     "edge:supersport": "node src/edge-supersport.ts",
-    "edge:sofascore": "node src/edge-sofascore-odds.ts"
+    "edge:sofascore": "node src/edge-sofascore-odds.ts",
+    "refresh:fc": "node src/refresh-firecrawl.ts"
   },
   "dependencies": {
     "pg": "^8.21.0",
