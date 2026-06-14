@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Schedule-aware match-result sync for nogomet.domovina.ai (every 15 min).
+     Spends Firecrawl credits ONLY while a match is in play / just ended (should-sync gate),
+     so a finished game lands on the live site within ~15 min instead of sitting "scheduled".
+     Install: cp to ~/Library/LaunchAgents/ then
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.pediludium.matchsync.plist
+     Logs: ~/Library/Logs/pediludium/matchsync.log
+     Note: launchd skips ticks while the Mac sleeps (coalesced to one run on wake). -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.pediludium.matchsync</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/ms/git/DeoOptimoMaximo/Pediludium/fetcher/scripts/match-sync.sh</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>900</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/ms/Library/Logs/pediludium/matchsync.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/ms/Library/Logs/pediludium/matchsync.log</string>
+</dict>
+</plist>
