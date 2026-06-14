@@ -35,6 +35,8 @@ practices.
 | [15-sofascore-challenge-and-piggyback.md](./15-sofascore-challenge-and-piggyback.md) | Challenge blok + mobilni proxy piggyback transport (harvest SPA odgovora) |
 | [16-edge-web2-web3-trading.md](./16-edge-web2-web3-trading.md) | Edge sloj: Polymarket/kladionice odds, +EV/arbitraža, dry-run bot |
 | [17-the-draw-paradox.md](./17-the-draw-paradox.md) | Zašto nijedna predikcija nije remi — geometrija matrice rezultata; izvor 1. blog posta |
+| [18-edge-layer-visual.md](./18-edge-layer-visual.md) | Edge sloj — vizualni vodič (Mermaid) za svaki korak Web2↔Web3 odds/+EV/arbitraže |
+| [19-resilient-multi-transport-fetching.md](./19-resilient-multi-transport-fetching.md) | Otporna multi-transport arhitektura: residential/mobilni piggyback + rotirajući Firecrawl (odds + rezultati bez blokiranja) |
 
 ## Tech stack (dogovoreno)
 
