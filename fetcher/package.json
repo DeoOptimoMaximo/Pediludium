@@ -16,6 +16,7 @@
     "scheduler": "node src/scheduler.ts",
     "predict": "node src/predict.ts",
     "predict:dc": "node src/dixon-coles.ts",
+    "predict:dcm": "node src/dc-market.ts",
     "simulate": "node src/simulate.ts",
     "standings": "node src/standings.ts",
     "history:record": "node src/prediction-history.ts record",

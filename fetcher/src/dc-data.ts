@@ -1,5 +1,5 @@
 import { dbQuery } from './db.ts';
-import type { DcFit, DcMatch } from './model.ts';
+import type { DcFit, DcMatch, Outcome } from './model.ts';
 
 /**
  * Shared data loading + host-advantage logic for the Dixon-Coles predictor and the
@@ -47,6 +47,35 @@ export async function loadDcMatches(nowMs = Date.now()): Promise<DcMatch[]> {
     byEvent.set(eventId, { home, away, hs, as, ageDays });
   }
   return [...byEvent.values()];
+}
+
+/**
+ * De-vigged market-implied 1X2 per match from public.match_odds (filled by the SofaScore
+ * Firecrawl odds transport, `edge:sofascore`). Used by the dc-market-v1 blend as a prior.
+ * Only rows with all three implied probabilities are returned; values are re-normalized to
+ * sum to 1 (they are already vig-free but may drift by rounding).
+ */
+export async function loadMarketOdds(): Promise<Map<number, Outcome>> {
+  const rows = await dbQuery<{
+    match_id: string;
+    imp_home: number | null;
+    imp_draw: number | null;
+    imp_away: number | null;
+  }>(
+    `select match_id, imp_home, imp_draw, imp_away
+       from public.match_odds
+      where imp_home is not null and imp_draw is not null and imp_away is not null`,
+  );
+  const out = new Map<number, Outcome>();
+  for (const r of rows) {
+    const h = Number(r.imp_home);
+    const d = Number(r.imp_draw);
+    const a = Number(r.imp_away);
+    const s = h + d + a;
+    if (!(s > 0)) continue;
+    out.set(Number(r.match_id), { pHome: h / s, pDraw: d / s, pAway: a / s });
+  }
+  return out;
 }
 
 /** Team ids of the host nations (for the home-edge bump), resolved from country code. */

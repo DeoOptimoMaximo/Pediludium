@@ -74,6 +74,7 @@ if node src/should-publish.ts check; then
   # DB-only compute (zero SofaScore calls) + publish to Cloudflare KV/R2
   step npm run standings   # group tables from match results (the /standings endpoint is blocked)
   step npm run predict:dc
+  step npm run predict:dcm  # market-anchored blend (DB-only: blends DC with stored match_odds)
   step npm run simulate
   step npm run history:record   # series gets a point only on real change → meaningful for calibration
   if npm run snapshot; then
