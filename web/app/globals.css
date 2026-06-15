@@ -130,6 +130,11 @@ html[data-layout='wide'] .teamgrid { grid-template-columns: repeat(auto-fill, mi
 .chip.live { color: #fff; background: var(--live); border-color: transparent; animation: pulse 1.4s infinite; }
 .chip.group { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
 .chip.tbd { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 30%, transparent); background: color-mix(in srgb, var(--warn) 8%, transparent); }
+/* prediction verdict on a finished match: ✓ model called the 1-X-2 outcome, ✗ missed —
+   number is the probability it gave to what actually happened (calibration at a glance). */
+.vchip { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .74rem; font-weight: 800; font-variant-numeric: tabular-nums; border: 1px solid var(--line); white-space: nowrap; }
+.vchip.ok { color: #15803d; background: color-mix(in srgb, #15803d 10%, transparent); border-color: color-mix(in srgb, #15803d 35%, transparent); }
+.vchip.no { color: var(--away); background: color-mix(in srgb, var(--away) 9%, transparent); border-color: color-mix(in srgb, var(--away) 32%, transparent); }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
 
 /* team row */

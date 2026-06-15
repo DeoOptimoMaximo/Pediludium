@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getMatches, getPredictions } from '@/lib/data';
 import { dayKey, fmtDay } from '@/lib/format';
 import { getDict } from '@/lib/lang';
@@ -16,11 +17,36 @@ export default async function FixturesPage() {
     (byDay.get(k) ?? byDay.set(k, []).get(k)!).push(m);
   }
 
+  // Running scoreboard across finished matches: how many 1-X-2 outcomes the frozen
+  // pre-match prediction actually called. Each row also shows its own ✓/✗ verdict.
+  let scored = 0;
+  let hits = 0;
+  for (const m of matches) {
+    if (m.status_type !== 'finished' || m.home_score == null || m.away_score == null) continue;
+    const p = preds.get(m.ss_id);
+    if (!p || p.p_home == null || p.p_draw == null || p.p_away == null) continue;
+    scored++;
+    const pick = [p.p_home, p.p_draw, p.p_away].indexOf(Math.max(p.p_home, p.p_draw, p.p_away));
+    const actual = m.home_score > m.away_score ? 0 : m.home_score === m.away_score ? 1 : 2;
+    if (pick === actual) hits++;
+  }
+
   return (
     <>
       <RealtimeRefresh table="match" />
       <h1 style={{ marginTop: 28 }}>{t.fixtures.title}</h1>
       <p className="muted">{t.fixtures.sub(matches.length)}</p>
+      {scored > 0 && (
+        <p className="muted small" style={{ marginTop: -6 }}>
+          <span className="vchip ok" style={{ marginRight: 8 }}>
+            ✓ {Math.round((hits / scored) * 100)}%
+          </span>
+          {t.scorecard.hits(hits, scored, Math.round((hits / scored) * 100))} ·{' '}
+          <Link href="/accuracy" className="link">
+            {t.nav.accuracy}
+          </Link>
+        </p>
+      )}
 
       {[...byDay.entries()].map(([day, ms]) => (
         <div key={day}>
