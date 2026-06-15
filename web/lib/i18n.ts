@@ -149,8 +149,9 @@ export interface Dict {
     perMatch: string;
     chartTitle: string;
     chartNote: string;
-    th: { date: string; match: string; pred: string; outcome: string; brier: string; logloss: string };
+    th: { date: string; match: string; pred: string; outcome: string; surprise: string; brier: string; logloss: string };
     outcomeName: (o: 0 | 1 | 2) => string;
+    surpriseNote: string;
   };
 }
 
@@ -309,8 +310,10 @@ export const T: Record<Lang, Dict> = {
       perMatch: 'Po utakmici',
       chartTitle: 'Brier kroz vrijeme (kumulativni prosjek)',
       chartNote: 'Svaka točka = stanje nakon ocjene još jedne utakmice. Ispod sive linije (0,667) model je bolji od nasumičnog pogađanja.',
-      th: { date: 'Datum', match: 'Utakmica', pred: 'Predikcija 1-X-2', outcome: 'Ishod', brier: 'Brier', logloss: 'Log-loss' },
+      th: { date: 'Datum', match: 'Utakmica', pred: 'Predikcija 1-X-2', outcome: 'Ishod', surprise: 'Iznenađenje', brier: 'Brier', logloss: 'Log-loss' },
       outcomeName: (o) => (o === 0 ? '1 (domaćin)' : o === 1 ? 'X (neriješeno)' : '2 (gost)'),
+      surpriseNote:
+        'Boja retka pokazuje koliko se stvarni ishod razlikuje od predikcije: zeleno = model je stvarnom ishodu dao visoku vjerojatnost (očekivano), crveno = nisku (iznenađenje). Postotak je vjerojatnost koju je model dao onome što se zaista dogodilo.',
     },
   },
   en: {
@@ -467,8 +470,10 @@ export const T: Record<Lang, Dict> = {
       perMatch: 'Per match',
       chartTitle: 'Brier over time (cumulative mean)',
       chartNote: 'Each point = the running average after scoring one more match. Below the grey line (0.667) the model beats random guessing.',
-      th: { date: 'Date', match: 'Match', pred: 'Prediction 1-X-2', outcome: 'Outcome', brier: 'Brier', logloss: 'Log-loss' },
+      th: { date: 'Date', match: 'Match', pred: 'Prediction 1-X-2', outcome: 'Outcome', surprise: 'Surprise', brier: 'Brier', logloss: 'Log-loss' },
       outcomeName: (o) => (o === 0 ? '1 (home)' : o === 1 ? 'X (draw)' : '2 (away)'),
+      surpriseNote:
+        'Row colour shows how far the actual outcome was from the prediction: green = the model gave the actual result a high probability (expected), red = a low one (a surprise). The percentage is the probability the model assigned to what actually happened.',
     },
   },
 };

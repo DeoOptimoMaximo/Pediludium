@@ -12,6 +12,21 @@ const NAIVE_BRIER = 2 / 3; // uniform ⅓-⅓-⅓ guess
 const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
 
 /**
+ * Visual divergence between the prediction and what actually happened, driven by the
+ * probability the model gave to the real outcome (pActual): high → the result was expected
+ * (green), low → a surprise the model didn't see coming (red). Returns a light row tint, a
+ * stronger left-edge, and a chip background — all alpha-blended so they read on both themes.
+ */
+function tintFor(pActual: number): { row: string; edge: string; chip: string } {
+  const h = Math.round(Math.max(0, Math.min(1, pActual)) * 130); // 0 = red, 130 = green
+  return {
+    row: `hsl(${h} 70% 50% / 0.12)`,
+    edge: `hsl(${h} 60% 45% / 0.85)`,
+    chip: `hsl(${h} 75% 50% / 0.22)`,
+  };
+}
+
+/**
  * Model backtesting — every prediction is frozen at the last snapshot before
  * kick-off and scored (multiclass Brier + log-loss) once the match finishes.
  * Lower is better; the uniform-guess baseline (0.667 / 1.099) is the bar a
@@ -98,6 +113,21 @@ export default async function AccuracyPage() {
             </div>
           )}
 
+          <p className="small muted" style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span
+              aria-hidden
+              style={{
+                display: 'inline-block',
+                width: 64,
+                height: 12,
+                borderRadius: 6,
+                background: `linear-gradient(90deg, ${tintFor(0).edge}, ${tintFor(0.5).edge}, ${tintFor(1).edge})`,
+                flexShrink: 0,
+              }}
+            />
+            {t.accuracy.surpriseNote}
+          </p>
+
           {models.map((pm) => (
             <div key={pm.key}>
               <div className="dayhdr">
@@ -113,25 +143,44 @@ export default async function AccuracyPage() {
                         <th style={{ textAlign: 'left' }}>{t.accuracy.th.match}</th>
                         <th>{t.accuracy.th.pred}</th>
                         <th>{t.accuracy.th.outcome}</th>
+                        <th title={t.accuracy.surpriseNote}>{t.accuracy.th.surprise}</th>
                         <th>{t.accuracy.th.brier}</th>
                         <th>{t.accuracy.th.logloss}</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {calib[pm.version]!.map((r) => (
-                        <tr key={r.match_id}>
-                          <td className="name muted small">{fmtDay(r.kickoff, lang)}</td>
-                          <td className="name">
-                            <Link href={`/match/${r.match_id}`} className="teamlink">{label(r)}</Link>
-                          </td>
-                          <td className="num">
-                            {Math.round(r.p[0] * 100)}–{Math.round(r.p[1] * 100)}–{Math.round(r.p[2] * 100)}
-                          </td>
-                          <td>{t.accuracy.outcomeName(r.outcome)}</td>
-                          <td className="num">{r.brier.toFixed(3)}</td>
-                          <td className="num">{r.logloss.toFixed(3)}</td>
-                        </tr>
-                      ))}
+                      {calib[pm.version]!.map((r) => {
+                        const pActual = r.p[r.outcome] ?? 0;
+                        const tint = tintFor(pActual);
+                        return (
+                          <tr key={r.match_id} style={{ background: tint.row }}>
+                            <td
+                              className="name muted small"
+                              style={{ borderLeft: `3px solid ${tint.edge}` }}
+                            >
+                              {fmtDay(r.kickoff, lang)}
+                            </td>
+                            <td className="name">
+                              <Link href={`/match/${r.match_id}`} className="teamlink">{label(r)}</Link>
+                            </td>
+                            <td className="num">
+                              {Math.round(r.p[0] * 100)}–{Math.round(r.p[1] * 100)}–{Math.round(r.p[2] * 100)}
+                            </td>
+                            <td>{t.accuracy.outcomeName(r.outcome)}</td>
+                            <td className="num">
+                              <span
+                                className="chip"
+                                style={{ background: tint.chip, borderColor: tint.edge, fontWeight: 700, color: 'var(--text)' }}
+                                title={t.accuracy.surpriseNote}
+                              >
+                                {Math.round(pActual * 100)}%
+                              </span>
+                            </td>
+                            <td className="num">{r.brier.toFixed(3)}</td>
+                            <td className="num">{r.logloss.toFixed(3)}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
