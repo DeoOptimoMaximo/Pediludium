@@ -1,5 +1,6 @@
 import { Fragment } from 'react';
 import {
+  getEdgeMeta,
   getEdgeStats,
   getMatchNames,
   getOddsBoard,
@@ -23,6 +24,18 @@ export const dynamic = 'force-dynamic';
 const od = (n: number | null | undefined) => (n == null ? '—' : n.toFixed(2));
 const usd = (n: number | null | undefined) => (n == null ? '—' : `$${n.toFixed(2)}`);
 const pct = (n: number | null | undefined) => (n == null ? '—' : `${Math.round(n * 100)}%`);
+
+// compact local timestamp for detection / freshness columns (Zagreb-style dd.mm. HH:MM)
+const ts = (s: string | null | undefined) =>
+  !s
+    ? '—'
+    : new Date(s).toLocaleString('hr-HR', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Europe/Zagreb',
+      });
 
 // short symbol for compact columns
 const sel = (s: string | null) =>
@@ -66,7 +79,8 @@ function Ext({ href, children }: { href: string; children: React.ReactNode }) {
 }
 
 export default async function EdgePage() {
-  const [stats, wallet, opps, orders, board, names, links] = await Promise.all([
+  const [meta, stats, wallet, opps, orders, board, names, links] = await Promise.all([
+    getEdgeMeta().catch(() => null),
     getEdgeStats().catch(() => ({ quotes: 0, venues: 0 })),
     getWallet().catch(() => null),
     getOpenOpportunities().catch(() => []),
@@ -78,6 +92,10 @@ export default async function EdgePage() {
 
   const ev = opps.filter((o) => o.kind === 'ev');
   const arb = opps.filter((o) => o.kind === 'arb');
+  const lastDetected = opps.reduce<string | null>(
+    (max, o) => (o.detected_at && (!max || o.detected_at > max) ? o.detected_at : max),
+    null,
+  );
   const settled = orders.filter((o) => o.status === 'settled');
   const pnl = settled.reduce((s, o) => s + (o.pnl_usd ?? 0), 0);
 
@@ -108,6 +126,18 @@ export default async function EdgePage() {
         arbitraža. <strong>Bot trguje lažnim novcem (dry-run)</strong> — ništa pravo se ne ulaže;
         ovo je eksperiment da vidimo je li model stvarno dobar prije nego išta riskiramo.
         (Hrvatske kladionice — SuperSport, PSK, Favbet, Germania, CroBet — priključujemo uskoro.)
+      </p>
+
+      {/* freshness banner — without it the page reads as static; this is when the data was captured */}
+      <p className="muted small" style={{ marginTop: -4 }}>
+        🕒 <strong>Podaci osvježeni:</strong> {meta ? ts(meta.generated_at) : 'uživo iz baze'}
+        {lastDetected && (
+          <>
+            {' · '}najnovija detekcija prilike: <strong>{ts(lastDetected)}</strong>
+          </>
+        )}
+        {' · '}prikupljanje koeficijenata vrti se periodički — ako se brojke ne mijenjaju, tržišta
+        su mirna ili je zadnji prolaz upravo ovaj gore.
       </p>
 
       {/* ── plain-language legend ───────────────────────────────────────────── */}
@@ -186,6 +216,7 @@ export default async function EdgePage() {
               <th style={{ textAlign: 'left' }}>Utakmica</th>
               <th>Tržište</th>
               <th title="Zajamčena zarada ako se ulozi rasporede po nogama">Profit</th>
+              <th title="Kada je bot uočio ovu priliku">Otkriveno</th>
               <th style={{ textAlign: 'left' }}>Gdje i kako (klikni za provjeru)</th>
             </tr>
           </thead>
@@ -197,6 +228,7 @@ export default async function EdgePage() {
                   <td style={{ textAlign: 'left' }}>{fx(o.match_id)}</td>
                   <td>{o.market === '1x2' ? 'Pobjednik' : 'Golovi (2.5)'}</td>
                   <td className="delta up">+{(o.edge * 100).toFixed(2)}%</td>
+                  <td className="muted" style={{ whiteSpace: 'nowrap' }}>{ts(o.detected_at)}</td>
                   <td style={{ textAlign: 'left' }}>
                     {legs.map((l, i) => {
                       const label = `${l.venue}: ${selWord(l.selection)} @ ${od(l.odds)} (uloži ${(l.stake_frac * 100).toFixed(0)}%)`;
@@ -213,7 +245,7 @@ export default async function EdgePage() {
             })}
             {arb.length === 0 && (
               <tr>
-                <td colSpan={4} className="muted">
+                <td colSpan={5} className="muted">
                   Trenutno nema arbitražnih prilika (treba ≥2 tržišta).
                 </td>
               </tr>
@@ -239,6 +271,7 @@ export default async function EdgePage() {
               <th title="Koliko Polymarket plaća za ovaj ishod">Koef.</th>
               <th title="Naš model: šansa za ovaj ishod">Model</th>
               <th title="Tržište: šansa za ovaj ishod (1 ÷ koeficijent)">Tržište</th>
+              <th title="Kada je bot uočio ovu priliku">Otkriveno</th>
               <th></th>
             </tr>
           </thead>
@@ -256,6 +289,7 @@ export default async function EdgePage() {
                   <td>{od(o.decimal_odds)}</td>
                   <td className="delta up">{pct(o.model_prob)}</td>
                   <td className="muted">{pct(marketP)}</td>
+                  <td className="muted" style={{ whiteSpace: 'nowrap' }}>{ts(o.detected_at)}</td>
                   <td>
                     <Ext href={venueUrl(o.venue_id ?? 'polymarket', o.match_id)}>Provjeri</Ext>
                   </td>
@@ -264,7 +298,7 @@ export default async function EdgePage() {
             })}
             {ev.length === 0 && (
               <tr>
-                <td colSpan={6} className="muted">
+                <td colSpan={7} className="muted">
                   Nema otvorenih value prilika.
                 </td>
               </tr>

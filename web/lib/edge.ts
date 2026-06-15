@@ -11,6 +11,11 @@ export const isSnapshot = process.env.NEXT_PUBLIC_DATA_SOURCE === 'snapshot';
 
 const impl = isSnapshot ? snapshot : supabase;
 
+/** Edge snapshot generation time, or null when reading live from Supabase. */
+export const getEdgeMeta: () => Promise<{ generated_at: string } | null> = isSnapshot
+  ? snapshot.getEdgeMeta
+  : async () => null;
+
 export const getEdgeStats = impl.getEdgeStats;
 export const getWallet = impl.getWallet;
 export const getOpenOpportunities = impl.getOpenOpportunities;

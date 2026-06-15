@@ -63,6 +63,12 @@ async function getEdge(): Promise<EdgeBlob> {
   return blob;
 }
 
+/** When the published edge blob was generated (the snapshot/edge fetch time). */
+export async function getEdgeMeta(): Promise<{ generated_at: string } | null> {
+  const at = (await getEdge()).generated_at;
+  return at ? { generated_at: at } : null;
+}
+
 export async function getEdgeStats(): Promise<EdgeStats> {
   return (await getEdge()).stats;
 }
