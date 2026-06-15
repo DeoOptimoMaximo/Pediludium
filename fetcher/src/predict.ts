@@ -86,24 +86,46 @@ async function main(): Promise<void> {
   );
   console.log(`[predict] fitting from ${teams.length} national teams' histories...`);
 
-  // 1) gather unique historical finished matches across all teams' histories
-  const events = new Map<number, AnyObj>();
-  for (const t of teams) {
-    const id = Number(t.ss_id);
-    try {
-      const { raw } = await getJson(`/team/${id}/events/last/0`, EventsResponseSchema);
-      await sample(String(id), raw);
-      for (const e of (raw as AnyObj).events as AnyObj[]) {
-        if (e.status?.type === 'finished' && e.homeScore?.current != null) events.set(e.id, e);
-      }
-    } catch (err) {
-      console.warn(`[predict] history ${t.name} failed: ${String(err).slice(0, 60)}`);
-    }
-  }
-  const hist = [...events.values()].sort(
-    (a, b) => (a.startTimestamp ?? 0) - (b.startTimestamp ?? 0),
+  // 1) gather unique historical finished matches from the stored team_match table.
+  // We deliberately read Postgres here instead of hitting SofaScore live: the direct API
+  // is challenge-blocked, and the old per-team live fetch silently failed for every team,
+  // leaving the whole Elo table stuck at the 1500 default. team_match is populated by the
+  // history backfill through the working transport, so the data is already local.
+  // Each match is stored once per side; distinct-on(event_id) collapses it to one row,
+  // oriented home-first (is_home desc) so home/away and scores line up.
+  const histRows = await dbQuery<{
+    event_id: number;
+    home_id: number;
+    away_id: number;
+    hs: number;
+    ascore: number;
+    ts: string | null;
+  }>(
+    `select distinct on (event_id)
+            event_id,
+            case when is_home then team_id else opponent_id end as home_id,
+            case when is_home then opponent_id else team_id end as away_id,
+            case when is_home then team_score else opponent_score end as hs,
+            case when is_home then opponent_score else team_score end as ascore,
+            start_ts as ts
+       from public.team_match
+      where team_score is not null and opponent_score is not null
+        and opponent_id is not null
+      order by event_id, is_home desc`,
   );
-  console.log(`[predict] ${hist.length} unique historical matches`);
+  // Postgres returns bigint columns (team ids) as strings — coerce to Number so the Elo
+  // map keys match the numeric team ids used when persisting (getElo(Number(ss_id))).
+  const hist = histRows
+    .map((r) => ({
+      id: Number(r.event_id),
+      startTimestamp: r.ts ? Math.floor(Date.parse(r.ts) / 1000) : 0,
+      homeTeam: { id: Number(r.home_id) },
+      awayTeam: { id: Number(r.away_id) },
+      homeScore: { current: Number(r.hs) },
+      awayScore: { current: Number(r.ascore) },
+    }))
+    .sort((a, b) => a.startTimestamp - b.startTimestamp);
+  console.log(`[predict] ${hist.length} unique historical matches (from team_match)`);
 
   // 2) Elo + goal accumulators (chronological)
   const elo = new Map<number, number>();
