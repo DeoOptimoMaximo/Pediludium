@@ -21,7 +21,11 @@ export default async function OverviewPage() {
     getSnapshotMeta(),
   ]);
   const upcoming = matches.filter((m) => m.status_type !== 'finished').slice(0, 7);
-  const opener = matches[0];
+  // Countdown to the next kickoff still ahead of us — the opener (matches[0]) is already
+  // in the past once the tournament starts, which froze the old countdown at 00:00:00.
+  const now = Date.now();
+  const nextMatch =
+    matches.find((m) => m.start_ts && new Date(m.start_ts).getTime() > now) ?? upcoming[0];
   const top = ratings.slice(0, 10);
   const liveCount = matches.filter((m) => m.status_type === 'inprogress').length;
   const isSnapshot = snap != null;
@@ -48,9 +52,19 @@ export default async function OverviewPage() {
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 10, flexWrap: 'wrap' }}>
           <LiveTicker lang={lang} staticCount={isSnapshot ? liveCount : undefined} />
-          {opener?.start_ts && (
+          {nextMatch?.start_ts && (
             <span className="muted small">
-              {t.homePage.kickOff} {fmtDay(opener.start_ts, lang)}
+              {t.homePage.kickOff} {fmtDay(nextMatch.start_ts, lang)}
+              {nextMatch.home_alpha2 || nextMatch.away_alpha2 ? (
+                <>
+                  {' · '}
+                  <span className="flag">{flag(nextMatch.home_alpha2)}</span>{' '}
+                  {teamName(nextMatch.home_name, nextMatch.home_alpha2, lang) ?? nextMatch.home_short}
+                  {' – '}
+                  {teamName(nextMatch.away_name, nextMatch.away_alpha2, lang) ?? nextMatch.away_short}{' '}
+                  <span className="flag">{flag(nextMatch.away_alpha2)}</span>
+                </>
+              ) : null}
             </span>
           )}
           {snap && (
@@ -59,7 +73,7 @@ export default async function OverviewPage() {
             </span>
           )}
         </div>
-        {opener?.start_ts && <Countdown toIso={opener.start_ts} labels={t.countdown} />}
+        {nextMatch?.start_ts && <Countdown toIso={nextMatch.start_ts} labels={t.countdown} />}
         <div className="btnrow">
           <a className="btn primary" href="/fixtures">
             {t.homePage.btnFixtures}
