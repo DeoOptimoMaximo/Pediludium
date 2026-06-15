@@ -35,12 +35,14 @@ interface Cand {
   home: string | null;
   away: string | null;
   status_type: string | null;
+  start_ts: string | null;
 }
 
 async function loadCandidates(): Promise<Cand[]> {
   const rows = await dbQuery<Omit<Cand, 'ss_id'> & { ss_id: string }>(
     `select m.ss_id, m.raw->>'slug' as slug, m.raw->>'customId' as cid,
-            m.raw->'homeTeam'->>'name' as home, m.raw->'awayTeam'->>'name' as away, m.status_type
+            m.raw->'homeTeam'->>'name' as home, m.raw->'awayTeam'->>'name' as away,
+            m.status_type, m.start_ts
        from public.match m
       where m.season_id = $1 and m.raw->>'slug' is not null and m.raw->>'customId' is not null
         and m.start_ts < now() + interval '30 minutes'
@@ -50,6 +52,33 @@ async function loadCandidates(): Promise<Cand[]> {
     [S, SINCE_H],
   );
   return rows.map((r) => ({ ...r, ss_id: Number(r.ss_id) }));
+}
+
+const MONTHS: Record<string, number> = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+};
+
+/**
+ * Parse the scheduled kickoff from a match page's "… starting on 14 Jun 2026 at 17:00 UTC …"
+ * line into an ISO timestamp. Exported for testing. Returns null if absent/unparseable.
+ * Lets refresh:fc also CORRECT a drifted start_ts from the same scrape it already does — so a
+ * rescheduled match isn't stranded outside the sync window (the schedule used to be refreshed
+ * only via the dead mobile proxy). null on no match.
+ */
+export function parseKickoffUtc(md: string): string | null {
+  if (!md) return null;
+  const m = md.match(/starting on (\d{1,2}) ([A-Za-z]{3}) (\d{4}) at (\d{2}):(\d{2}) UTC/i);
+  if (!m) return null;
+  const day = Number(m[1]);
+  const mon = MONTHS[m[2]!.toLowerCase()];
+  const year = Number(m[3]);
+  const hh = Number(m[4]);
+  const mm = Number(m[5]);
+  if (mon === undefined) return null;
+  const t = Date.UTC(year, mon, day, hh, mm, 0);
+  if (!Number.isFinite(t)) return null;
+  return new Date(t).toISOString();
 }
 
 export interface Extracted {
@@ -125,8 +154,12 @@ function hashCode(s: string): number {
   return h;
 }
 
-/** Scrape a match page as markdown (1 credit) and parse the result. */
-function scrapeResult(url: string, home: string | null, away: string | null): Extracted | null {
+/** Scrape a match page as markdown (1 credit); parse both the result and the kickoff time. */
+function scrapeResult(
+  url: string,
+  home: string | null,
+  away: string | null,
+): { e: Extracted | null; kickoff: string | null } {
   const out = path.join(tmpdir(), `fcres-${Math.abs(hashCode(url))}.md`);
   // --max-age 0 forces a FRESH render every call. Firecrawl caches scrapes by default, and a
   // live match scraped once near kickoff would otherwise keep returning that stale "notstarted"
@@ -139,17 +172,39 @@ function scrapeResult(url: string, home: string | null, away: string | null): Ex
   );
   if (res.status !== 0) {
     console.warn(`[refresh:fc] scrape failed (${res.status}): ${String(res.stderr).slice(0, 120)}`);
-    return null;
+    return { e: null, kickoff: null };
   }
   try {
     const md = spawnSync('cat', [out], { encoding: 'utf8' }).stdout ?? res.stdout ?? '';
-    return parseResultMarkdown(md, home, away);
+    return { e: parseResultMarkdown(md, home, away), kickoff: parseKickoffUtc(md) };
   } catch (e) {
     console.warn(`[refresh:fc] parse failed: ${String(e).slice(0, 100)}`);
-    return null;
+    return { e: null, kickoff: null };
   } finally {
     void rm(out, { force: true });
   }
+}
+
+/**
+ * Correct a drifted kickoff. Only for matches not yet finished, only when the parsed time
+ * differs from our stored start_ts, and only within a sane horizon ([now-2d, now+90d]) so a
+ * stray date on the page can't fling a fixture across the calendar. Updates start_ts only.
+ * Returns the new ISO time if it changed, else null.
+ */
+async function applyKickoff(c: Cand, kickoffIso: string | null): Promise<string | null> {
+  if (!kickoffIso) return null;
+  const cur = c.start_ts ? new Date(c.start_ts).toISOString() : null;
+  if (cur === kickoffIso) return null;
+  const t = new Date(kickoffIso).getTime();
+  const now = Date.now();
+  if (t < now - 2 * 864e5 || t > now + 90 * 864e5) return null; // implausible → ignore
+  if (DRY) return kickoffIso;
+  await dbQuery(
+    `update public.match set start_ts = $2, fetched_at = now()
+      where ss_id = $1 and status_type <> 'finished'`,
+    [c.ss_id, kickoffIso],
+  );
+  return kickoffIso;
 }
 
 /** Update only score + status (+ derived winner_code/status_code) — never fixtures/teams. */
@@ -180,9 +235,10 @@ async function main(): Promise<void> {
   }
   console.log(`[refresh:fc] checking ${cands.length} matches via Firecrawl${DRY ? ' (DRY RUN)' : ''}`);
   let updated = 0;
+  let rescheduled = 0;
   for (const c of cands) {
     const url = `https://www.sofascore.com/football/match/${c.slug}/${c.cid}`;
-    const e = scrapeResult(url, c.home, c.away);
+    const { e, kickoff } = scrapeResult(url, c.home, c.away);
     if (!e) {
       console.warn(`[refresh:fc] ${c.home} v ${c.away}: no result extracted`);
       continue;
@@ -191,8 +247,19 @@ async function main(): Promise<void> {
     const tag = changed ? (DRY ? 'WOULD UPDATE' : 'updated') : 'skip (notstarted/partial)';
     console.log(`[refresh:fc] ${c.home} v ${c.away}: ${e.home_score ?? '-'}-${e.away_score ?? '-'} ${e.status} → ${tag}`);
     if (changed) updated++;
+    // Correct a drifted kickoff from the same scrape (free) — only while not finished.
+    if (e.status !== 'finished') {
+      const moved = await applyKickoff(c, kickoff);
+      if (moved) {
+        console.log(`[refresh:fc] ${c.home} v ${c.away}: kickoff ${c.start_ts ?? '?'} → ${moved}${DRY ? ' (DRY)' : ''}`);
+        rescheduled++;
+      }
+    }
   }
-  console.log(`[refresh:fc] ${DRY ? 'would update' : 'updated'} ${updated}/${cands.length} matches`);
+  console.log(
+    `[refresh:fc] ${DRY ? 'would update' : 'updated'} ${updated}/${cands.length} matches` +
+      (rescheduled ? `, ${rescheduled} kickoff${rescheduled > 1 ? 's' : ''} corrected` : ''),
+  );
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

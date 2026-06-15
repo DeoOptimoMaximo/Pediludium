@@ -41,6 +41,13 @@ trap 'rmdir "$LOCK_DIR"' EXIT
 
 echo "[$(date -u +%FT%TZ)] ===== match-sync tick ====="
 
+# Ensure the active Firecrawl key still has credits; rotate to the next funded key if not.
+# The pool lives in ~/.config/firecrawl/keys.json and rotate.sh writes the chosen key to the
+# CLI creds (~/Library/Application Support/firecrawl-cli/credentials.json). Rotation is NOT
+# otherwise automatic — without this a depleted active key would silently fail every scrape.
+ROTATE="$HOME/.config/firecrawl/rotate.sh"
+[ -x "$ROTATE" ] && step bash "$ROTATE"
+
 # Firecrawl result fetch, windowed to matches in/just-after play (independent of the proxy).
 # 18h window matches the should-sync gate: covers an overnight so an evening match that
 # finishes while ticks are stale/asleep is still caught (and re-fetched FRESH — refresh:fc

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseResultMarkdown } from './refresh-firecrawl.ts';
+import { parseKickoffUtc, parseResultMarkdown } from './refresh-firecrawl.ts';
 
 // Representative slices of a real SofaScore match page rendered to markdown by Firecrawl
 // (Australia 2-0 Türkiye, 2026-06-14) — the exact strings the parser must handle.
@@ -84,5 +84,25 @@ describe('parseResultMarkdown', () => {
 
   it('returns null on empty input', () => {
     expect(parseResultMarkdown('', 'A', 'B')).toBeNull();
+  });
+});
+
+describe('parseKickoffUtc', () => {
+  it('parses the "starting on … at … UTC" line into an ISO timestamp', () => {
+    const md = 'Germany is going head to head with Curaçao starting on 14 Jun 2026 at 17:00 UTC at NRG Stadium.';
+    expect(parseKickoffUtc(md)).toBe('2026-06-14T17:00:00.000Z');
+  });
+
+  it('handles a single-digit day and a different month', () => {
+    expect(parseKickoffUtc('… starting on 3 Jul 2026 at 02:30 UTC …')).toBe('2026-07-03T02:30:00.000Z');
+  });
+
+  it('is case-insensitive on the month abbreviation', () => {
+    expect(parseKickoffUtc('starting on 09 DEC 2026 at 20:00 UTC')).toBe('2026-12-09T20:00:00.000Z');
+  });
+
+  it('returns null when no kickoff line is present', () => {
+    expect(parseKickoffUtc('Australia\nFinished\nFT 2 - 0')).toBeNull();
+    expect(parseKickoffUtc('')).toBeNull();
   });
 });
