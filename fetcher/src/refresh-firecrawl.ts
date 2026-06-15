@@ -128,9 +128,13 @@ function hashCode(s: string): number {
 /** Scrape a match page as markdown (1 credit) and parse the result. */
 function scrapeResult(url: string, home: string | null, away: string | null): Extracted | null {
   const out = path.join(tmpdir(), `fcres-${Math.abs(hashCode(url))}.md`);
+  // --max-age 0 forces a FRESH render every call. Firecrawl caches scrapes by default, and a
+  // live match scraped once near kickoff would otherwise keep returning that stale "notstarted"
+  // preview for hours — the match would fall out of the sync window before its real score ever
+  // landed (root cause of finished games stuck as "scheduled" on the public scorecard).
   const res = spawnSync(
     'firecrawl',
-    ['scrape', url, '--format', 'markdown', '--country', 'HR', '--wait-for', '6000', '-o', out],
+    ['scrape', url, '--format', 'markdown', '--country', 'HR', '--max-age', '0', '--wait-for', '8000', '-o', out],
     { encoding: 'utf8', timeout: 90_000 },
   );
   if (res.status !== 0) {

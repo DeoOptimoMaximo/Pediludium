@@ -13,12 +13,15 @@ import { closeDb, dbQuery } from './db.ts';
  *   exit 10 = nothing in window → skip (0 credits, 0 work)
  *
  * Active window: not yet 'finished' in our DB AND kickoff is within [now-WINDOW_H, now+15m].
- * WINDOW_H (default 4h) comfortably covers 90' + stoppage + ET/penalties + the lag before
- * SofaScore flips the page to Finished. After that, a still-unfinished row is a data gap,
- * not a live match — the hourly job / a manual catch-up handles it, not this credit-spender.
+ * WINDOW_H (default 18h) must cover not just one match (90' + ET/penalties + the lag before
+ * SofaScore flips to Finished) but an overnight: an evening kickoff that finishes while no
+ * tick lands (Mac asleep, or Firecrawl serving a stale cached render) must still be inside the
+ * window the next morning so it finally gets caught — not stranded as "scheduled" for a day.
+ * A match leaves the window the instant it is marked finished, so the wide window costs nothing
+ * in steady state; it only keeps still-unresolved recent matches eligible for one more check.
  */
 
-const WINDOW_H = Number(process.env.SYNC_WINDOW_H ?? 4);
+const WINDOW_H = Number(process.env.SYNC_WINDOW_H ?? 18);
 const EXIT_PROCEED = 0;
 const EXIT_SKIP = 10;
 

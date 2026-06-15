@@ -42,7 +42,10 @@ trap 'rmdir "$LOCK_DIR"' EXIT
 echo "[$(date -u +%FT%TZ)] ===== match-sync tick ====="
 
 # Firecrawl result fetch, windowed to matches in/just-after play (independent of the proxy).
-step env REFRESH_FC_SINCE_H=4 npm run refresh:fc
+# 18h window matches the should-sync gate: covers an overnight so an evening match that
+# finishes while ticks are stale/asleep is still caught (and re-fetched FRESH — refresh:fc
+# forces --max-age 0). A match drops out the moment it's marked finished, so cost stays low.
+step env REFRESH_FC_SINCE_H=18 npm run refresh:fc
 
 # Only recompute + publish when match reality actually changed (or a match is live).
 if node src/should-publish.ts check; then
