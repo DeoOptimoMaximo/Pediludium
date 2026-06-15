@@ -51,6 +51,17 @@ html[data-theme='dark'] {
   --page-glow: radial-gradient(1200px 600px at 50% -200px, #10204a26, transparent);
 }
 
+/* Self-hosted flag emoji glyphs — Windows has no flag emoji at all and some Chromium
+   builds (Brave) opt out, so the regional-indicator pairs fall back to "HR" letters.
+   This Twemoji subset (flags only — safe to list first; non-flag text falls through)
+   makes the country/subdivision flags render identically on every OS and browser. */
+@font-face {
+  font-family: 'Twemoji Country Flags';
+  src: url('/fonts/TwemojiCountryFlags.woff2') format('woff2');
+  font-display: swap;
+  unicode-range: U+1F1E6-1F1FF, U+1F3F4, U+E0062-E007F;
+}
+
 * { box-sizing: border-box; }
 html, body { padding: 0; margin: 0; }
 body {
@@ -141,7 +152,7 @@ html[data-layout='wide'] .teamgrid { grid-template-columns: repeat(auto-fill, mi
 .team { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .team img { width: 22px; height: 22px; object-fit: contain; }
 .team .nm { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.flag { font-size: 1.05rem; }
+.flag { font-size: 1.05rem; font-family: 'Twemoji Country Flags', ui-sans-serif, system-ui, sans-serif; line-height: 1; }
 
 /* match row */
 .match { display: flex; align-items: center; gap: 12px; padding: 11px 4px; border-top: 1px solid var(--line); }
