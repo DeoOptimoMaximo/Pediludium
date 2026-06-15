@@ -37,6 +37,7 @@ practices.
 | [17-the-draw-paradox.md](./17-the-draw-paradox.md) | Zašto nijedna predikcija nije remi — geometrija matrice rezultata; izvor 1. blog posta |
 | [18-edge-layer-visual.md](./18-edge-layer-visual.md) | Edge sloj — vizualni vodič (Mermaid) za svaki korak Web2↔Web3 odds/+EV/arbitraže |
 | [19-resilient-multi-transport-fetching.md](./19-resilient-multi-transport-fetching.md) | Otporna multi-transport arhitektura: residential/mobilni piggyback + rotirajući Firecrawl (odds + rezultati bez blokiranja) |
+| [20-blog-series-plan.md](./20-blog-series-plan.md) | Plan serije blogpostova — uređivačka načela + prioritizirani backlog tema iz dosadašnjeg znanja (modeli, data/infra, edge, proizvod) |
 
 ## Tech stack (dogovoreno)
 
