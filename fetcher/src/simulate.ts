@@ -37,7 +37,8 @@ type Ref =
   | { kind: 'pos'; group: string; pos: 0 | 1 } // group winner (0) / runner-up (1)
   | { kind: 'third'; slotId: string; groups: string[] } // best-third from one of `groups`
   | { kind: 'win'; num: number } // winner of match number n
-  | { kind: 'lose'; num: number }; // loser of match number n
+  | { kind: 'lose'; num: number } // loser of match number n
+  | { kind: 'team'; id: number }; // already-resolved team (real result filled the slot)
 
 interface KoMatch {
   num: number;
@@ -46,7 +47,12 @@ interface KoMatch {
   away: Ref;
 }
 
-function parseRef(name: string, matchNum: number, side: 'home' | 'away'): Ref {
+function parseRef(
+  name: string,
+  matchNum: number,
+  side: 'home' | 'away',
+  nameToId: Map<string, number>,
+): Ref {
   const s = (name ?? '').trim().toUpperCase();
   let m: RegExpExecArray | null;
   if ((m = /^W(\d+)$/.exec(s))) return { kind: 'win', num: Number(m[1]) };
@@ -62,6 +68,9 @@ function parseRef(name: string, matchNum: number, side: 'home' | 'away'): Ref {
     return { kind: 'pos', group: m[2]!, pos: m[1] === '1' ? 0 : 1 };
   if ((m = /^([A-L])([12])$/.exec(s)))
     return { kind: 'pos', group: m[1]!, pos: m[2] === '1' ? 0 : 1 };
+  // group stage finished: the slot now carries the real qualifier's name — pin it
+  const id = nameToId.get(s);
+  if (id != null) return { kind: 'team', id };
   throw new Error(`unparseable knockout slot "${name}" (match ${matchNum})`);
 }
 
@@ -179,10 +188,12 @@ async function main(): Promise<void> {
     away: Number(f.away_team_id),
     group: f.group_name.replace('Group ', '').trim(),
   }));
+  const nameToId = new Map<string, number>();
   for (const t of await dbQuery<{ ss_id: string; name: string }>(
     `select ss_id, name from public.team where is_national`,
   )) {
     teamNames.set(Number(t.ss_id), t.name);
+    nameToId.set(t.name.trim().toUpperCase(), Number(t.ss_id));
   }
 
   // 3) reconstruct the knockout bracket from fixture placeholders
@@ -212,8 +223,8 @@ async function main(): Promise<void> {
     return {
       num,
       roundKey: ROUND_KEY[r.round]!,
-      home: parseRef(r.h, num, 'home'),
-      away: parseRef(r.a, num, 'away'),
+      home: parseRef(r.h, num, 'home', nameToId),
+      away: parseRef(r.a, num, 'away', nameToId),
     };
   });
   ko.sort((x, y) => x.num - y.num);
@@ -354,6 +365,8 @@ async function main(): Promise<void> {
           return winner.get(r.num)!;
         case 'lose':
           return loser.get(r.num)!;
+        case 'team':
+          return r.id;
       }
     };
     const winner = new Map<number, number>();
