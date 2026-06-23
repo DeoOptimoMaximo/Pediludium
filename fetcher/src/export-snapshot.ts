@@ -347,11 +347,15 @@ async function exportMovers(): Promise<{ window_h: number; from: string | null; 
  * ids arrive as JSON numbers. Empty tables → empty arrays (page degrades gracefully).
  */
 async function exportEdge(generatedAt: string): Promise<Record<string, unknown>> {
+  // open opps on fixtures that haven't kicked off — guards the race where a match starts
+  // between scans (the opp stays 'open' until the next scan, but it's no longer bettable).
   const opportunities = await jsonOne<unknown[]>(
     `select coalesce(json_agg(to_jsonb(o) order by o.edge desc), '[]'::json) as j from (
-       select id, kind, match_id, market, selection, venue_id, decimal_odds, model_prob,
-              edge, kelly_fraction, legs, detected_at
-         from public.edge_opportunity where status='open') o`,
+       select eo.id, eo.kind, eo.match_id, eo.market, eo.selection, eo.venue_id,
+              eo.decimal_odds, eo.model_prob, eo.edge, eo.kelly_fraction, eo.legs, eo.detected_at
+         from public.edge_opportunity eo
+         join public.match m on m.ss_id = eo.match_id
+        where eo.status='open' and m.start_ts > now()) o`,
   );
   const orders = await jsonOne<unknown[]>(
     `select coalesce(json_agg(to_jsonb(o) order by o.placed_at desc), '[]'::json) as j from (
@@ -369,11 +373,13 @@ async function exportEdge(generatedAt: string): Promise<Record<string, unknown>>
        select match_id, max(home_name) as home_name, max(away_name) as away_name,
               json_object_agg(venue_id, sel) as venues
          from (
-           select match_id, venue_id, max(home_name) as home_name, max(away_name) as away_name,
-                  json_object_agg(selection, decimal_odds) as sel
-             from public.edge_quote
-            where market='1x2' and match_id is not null
-            group by match_id, venue_id
+           select q.match_id, q.venue_id, max(q.home_name) as home_name,
+                  max(q.away_name) as away_name,
+                  json_object_agg(q.selection, q.decimal_odds) as sel
+             from public.edge_quote q
+             join public.match m on m.ss_id = q.match_id
+            where q.market='1x2' and q.match_id is not null and m.start_ts > now()
+            group by q.match_id, q.venue_id
          ) per_venue
         group by match_id) b`,
   );

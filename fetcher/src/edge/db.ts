@@ -65,13 +65,19 @@ export interface QuoteRow {
   extra: Record<string, unknown> | null;
 }
 
-/** All quotes for matched events (match_id not null), newest first per row. */
+/**
+ * Quotes for matched events that HAVEN'T kicked off yet (match_id set, start_ts in the
+ * future). An edge only exists on a bet you can still place — once a fixture starts, its
+ * prematch 1x2/ou25 markets are void for us, so we never scan, price, or stake them.
+ */
 export async function loadMatchedQuotes(): Promise<QuoteRow[]> {
   return dbQuery<QuoteRow>(
-    `select venue_id, external_event_id, market, selection, match_id, home_name, away_name,
-            start_ts, decimal_odds, implied_prob, fair_prob, extra
-       from public.edge_quote
-      where match_id is not null`,
+    `select q.venue_id, q.external_event_id, q.market, q.selection, q.match_id, q.home_name,
+            q.away_name, q.start_ts, q.decimal_odds, q.implied_prob, q.fair_prob, q.extra
+       from public.edge_quote q
+       join public.match m on m.ss_id = q.match_id
+      where q.match_id is not null
+        and m.start_ts > now()`,
   );
 }
 
