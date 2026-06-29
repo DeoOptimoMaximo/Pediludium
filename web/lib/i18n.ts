@@ -10,7 +10,17 @@ export const LANGS: Lang[] = ['hr', 'en'];
 
 export interface Dict {
   locale: string;
-  nav: { overview: string; fixtures: string; groups: string; teams: string; predictions: string; forecast: string; movers: string; scorecard: string; accuracy: string; blog: string };
+  nav: { overview: string; fixtures: string; groups: string; teams: string; predictions: string; forecast: string; movers: string; scorecard: string; bracket: string; accuracy: string; blog: string };
+  bracket: {
+    title: string;
+    sub: string;
+    progress: (played: number, total: number) => string;
+    rounds: { r32: string; r16: string; qf: string; sf: string; final: string; third: string };
+    tbd: string;
+    winnerOf: (a: string, b: string) => string;
+    ft: string;
+    note: string;
+  };
   blog: { title: string; sub: string; minRead: string; back: string };
   ui: { toDark: string; toLight: string; toWide: string; toBoxed: string };
   common: {
@@ -158,7 +168,24 @@ export interface Dict {
 export const T: Record<Lang, Dict> = {
   hr: {
     locale: 'hr-HR',
-    nav: { overview: 'Pregled', fixtures: 'Raspored', groups: 'Skupine', teams: 'Momčadi', predictions: 'Predikcije', forecast: 'Prognoza', movers: 'Pomaci', scorecard: 'Pogodci', accuracy: 'Točnost', blog: 'Blog' },
+    nav: { overview: 'Pregled', fixtures: 'Raspored', groups: 'Skupine', teams: 'Momčadi', predictions: 'Predikcije', forecast: 'Prognoza', movers: 'Pomaci', scorecard: 'Pogodci', bracket: 'Ljestvica', accuracy: 'Točnost', blog: 'Blog' },
+    bracket: {
+      title: 'Eliminacijska faza',
+      sub: 'Put do naslova — od šesnaestine finala do finala, slijeva nadesno. Parovi se popunjavaju kako se utakmice igraju.',
+      progress: (p, n) => `Šesnaestina finala: ${p}/${n} odigrano`,
+      rounds: {
+        r32: 'Šesnaestina finala',
+        r16: 'Osmina finala',
+        qf: 'Četvrtfinale',
+        sf: 'Polufinale',
+        final: 'Finale',
+        third: 'Za 3. mjesto',
+      },
+      tbd: 'Još neodređeno',
+      winnerOf: (a, b) => `Pobjednik ${a}/${b}`,
+      ft: 'Kraj',
+      note: 'Parovi i rezultati sa SofaScorea; kasniji se krugovi popunjavaju automatski kako pobjednici budu poznati. Klik na utakmicu otvara detalje i predikciju.',
+    },
     blog: {
       title: 'Blog — tehničke analize',
       sub: 'Kako model zapravo računa. Otvorene, matematički potkrijepljene analize iza svake predikcije i izgleda turnira.',
@@ -318,7 +345,24 @@ export const T: Record<Lang, Dict> = {
   },
   en: {
     locale: 'en-GB',
-    nav: { overview: 'Overview', fixtures: 'Fixtures', groups: 'Groups', teams: 'Teams', predictions: 'Predictions', forecast: 'Forecast', movers: 'Movers', scorecard: 'Scorecard', accuracy: 'Accuracy', blog: 'Blog' },
+    nav: { overview: 'Overview', fixtures: 'Fixtures', groups: 'Groups', teams: 'Teams', predictions: 'Predictions', forecast: 'Forecast', movers: 'Movers', scorecard: 'Scorecard', bracket: 'Bracket', accuracy: 'Accuracy', blog: 'Blog' },
+    bracket: {
+      title: 'Knockout bracket',
+      sub: 'The road to the title — round of 32 through the final, left to right. Ties fill in as matches are played.',
+      progress: (p, n) => `Round of 32: ${p}/${n} played`,
+      rounds: {
+        r32: 'Round of 32',
+        r16: 'Round of 16',
+        qf: 'Quarter-finals',
+        sf: 'Semi-finals',
+        final: 'Final',
+        third: 'Third place',
+      },
+      tbd: 'To be decided',
+      winnerOf: (a, b) => `Winner ${a}/${b}`,
+      ft: 'FT',
+      note: 'Fixtures and results from SofaScore; later rounds fill in automatically as winners are decided. Tap a match for details and the prediction.',
+    },
     blog: {
       title: 'Blog — technical write-ups',
       sub: 'How the model actually computes. Open, math-backed analyses behind every prediction and tournament odd.',

@@ -29,6 +29,7 @@ export function Nav({ lang, theme, layout }: { lang: Lang; theme: Theme; layout:
     ['/simulation', t.forecast],
     ['/movers', t.movers],
     ['/scorecard', t.scorecard],
+    ['/bracket', t.bracket],
     ['/accuracy', t.accuracy],
     ['/blog', t.blog],
     ['/edge', 'Edge'],
