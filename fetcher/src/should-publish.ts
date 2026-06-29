@@ -39,6 +39,7 @@ async function currentState(): Promise<{ digest: string; live: number }> {
               ss_id || '|' || coalesce(status_type, '') || '|' || coalesce(status_code::text, '')
               || '|' || coalesce(home_score::text, '') || '|' || coalesce(away_score::text, '')
               || '|' || coalesce(winner_code::text, '') || '|' || coalesce(round::text, '')
+              || '|' || coalesce(home_team_id::text, '') || '|' || coalesce(away_team_id::text, '')
               || '|' || coalesce(start_ts::text, ''),
               E'\n' order by ss_id)), 'empty') as digest,
             count(*) filter (where status_type = 'inprogress')::int as live

@@ -54,6 +54,15 @@ ROTATE="$HOME/.config/firecrawl/rotate.sh"
 # forces --max-age 0). A match drops out the moment it's marked finished, so cost stays low.
 step env REFRESH_FC_SINCE_H=18 npm run refresh:fc
 
+# Knockout phase: once a tie's feeder matches are finished, re-point its placeholder slots
+# (2A / W73 …) to the real qualifiers — credit-free gate fires only when something is newly
+# resolvable, so we don't scrape SofaScore every tick for weeks. Runs before the publish gate
+# (the digest now covers home/away team ids), and also refreshes raw.slug/customId so the next
+# refresh:fc tick can fetch the re-slugged tie's result.
+if node src/should-resolve-ko.ts; then
+  step env RESOLVE_KO_SEEDS=1 npm run resolve:ko
+fi
+
 # Only recompute + publish when match reality actually changed (or a match is live).
 if node src/should-publish.ts check; then
   step npm run standings

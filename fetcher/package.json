@@ -12,6 +12,7 @@
     "backfill": "node src/backfill.ts",
     "history": "node src/history.ts",
     "refresh": "node src/refresh.ts",
+    "resolve:ko": "node src/resolve-knockout.ts",
     "enrich": "node src/enrich.ts",
     "scheduler": "node src/scheduler.ts",
     "predict": "node src/predict.ts",
