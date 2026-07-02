@@ -39,11 +39,21 @@ interface Cand {
 }
 
 async function loadCandidates(): Promise<Cand[]> {
+  // home/away come from the RESOLVED team_id joins — the same source the wc2026_match view
+  // uses to render names — NOT raw.homeTeam/awayTeam. parseResultMarkdown verifies the score
+  // orientation against these names, so the score is always attributed to the team we actually
+  // display. A knockout tie whose home/away slot order differs from SofaScore's (resolve:ko
+  // can't reliably read home/away from a rendered page — the URL slug order is inconsistent)
+  // would otherwise get the winner inverted on the public scorecard. Fall back to raw names
+  // for any slot not yet re-pointed to a national team.
   const rows = await dbQuery<Omit<Cand, 'ss_id'> & { ss_id: string }>(
     `select m.ss_id, m.raw->>'slug' as slug, m.raw->>'customId' as cid,
-            m.raw->'homeTeam'->>'name' as home, m.raw->'awayTeam'->>'name' as away,
+            coalesce(th.name, m.raw->'homeTeam'->>'name') as home,
+            coalesce(ta.name, m.raw->'awayTeam'->>'name') as away,
             m.status_type, m.start_ts
        from public.match m
+       left join public.team th on th.ss_id = m.home_team_id
+       left join public.team ta on ta.ss_id = m.away_team_id
       where m.season_id = $1 and m.raw->>'slug' is not null and m.raw->>'customId' is not null
         and m.start_ts < now() + interval '30 minutes'
         and m.start_ts > now() - make_interval(hours => $2)

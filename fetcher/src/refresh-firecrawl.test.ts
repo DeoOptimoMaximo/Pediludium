@@ -64,6 +64,17 @@ describe('parseResultMarkdown', () => {
     expect(r).toEqual({ home_score: 1, away_score: 2, status: 'finished' });
   });
 
+  // Regression (BiH/USA R32 inversion, 2026-07-02): a resolved knockout tie can carry a
+  // home/away slot order that is the reverse of SofaScore's — loadCandidates passes the names
+  // from home_team_id/away_team_id (what we display), so the score MUST follow those names, not
+  // the commentary's slot position. Here we display BiH as home / USA as away; SofaScore's
+  // full-time line names USA (its home) with 2. The 2 must land on USA (the away slot we show).
+  it('orients the score to the displayed team even when our home/away is reversed vs SofaScore', () => {
+    const md = 'Match ends, USA 2, Bosnia & Herzegovina 0.\nFull-time\n';
+    const r = parseResultMarkdown(md, 'Bosnia & Herzegovina', 'USA'); // displayed home=BiH, away=USA
+    expect(r).toEqual({ home_score: 0, away_score: 2, status: 'finished' }); // USA (away) won 2-0
+  });
+
   it('detects a not-started match', () => {
     const r = parseResultMarkdown(NOTSTARTED_MD, 'France', 'Senegal');
     expect(r?.status).toBe('notstarted');

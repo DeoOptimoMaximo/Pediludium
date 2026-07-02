@@ -17,13 +17,23 @@ import { WORLD_CUP } from './config.ts';
  * appears as `![Brazil](…/team/4748/image)-![Japan](…/team/4770/image)](…/match/japan-brazil/
  * CODE#id:12813012)`. Image order is home–away; the `#id:N` is our `match.ss_id`. An
  * already-kicked-off tie renders with a score instead of the clean image pair, so for those
- * we fall back to the URL slug (`{away}-{home}`) and resolve names against our team table.
- * We re-point `home_team_id`/`away_team_id` to the resolved national teams; the
+ * we fall back to splitting the URL slug into two known team slugs (order is best-effort — the
+ * slug is NOT a reliable home/away indicator, see below) and resolve names against our team
+ * table. We re-point `home_team_id`/`away_team_id` to the resolved national teams; the
  * `wc2026_match` view derives names/flags from those joins, so the scorecard and the bracket
  * page light up immediately — no `raw` rewrite needed.
  *
- * Safety rails: only touches knockout rounds, only when BOTH resolved ids are national teams
- * already in our `team` table, and only flips a slot that isn't already pointing at them.
+ * IMPORTANT — home/away order is cosmetic, never trust it for results. SofaScore's URL slug
+ * does NOT consistently encode home–away (observed both `{home}-{away}` and `{away}-{home}`
+ * across WC2026 group ties), so the resolved slot order can differ from SofaScore's real
+ * home/away. That's harmless for the WINNER because refresh:fc attributes each score to the
+ * team it renders (matched by NAME against home_team_id/away_team_id), not to a slot position.
+ * To keep it harmless we ONLY resolve ties that haven't started — once a result is in, its
+ * home_score/away_score are frozen in raw order and re-pointing the slots would invert the
+ * displayed winner (root cause of the BiH/USA R32 inversion, fixed 2026-07-02).
+ *
+ * Safety rails: only touches not-started knockout rounds, only when BOTH resolved ids are
+ * national teams already in our `team` table, and only flips a slot that isn't pointing at them.
  *
  * After this, re-run predict:dc → predict:dcm → simulate → snapshot to publish.
  */
@@ -160,10 +170,16 @@ async function main(): Promise<void> {
       home_team_id: string | null;
       away_team_id: string | null;
     }>(
+      // Only pre-match ties: once a knockout match has kicked off/finished its slots are
+      // settled, and its home_score/away_score are already stored in the raw home/away order.
+      // Re-pointing home_team_id/away_team_id afterwards (the rendered page's home/away order is
+      // not reliably derivable — the URL slug order is inconsistent) would silently INVERT the
+      // displayed winner. So resolve placeholders only while the tie hasn't started.
       `select m.ss_id, m.round, m.raw->>'slug' as slug, m.raw->>'customId' as cid,
               m.home_team_id, m.away_team_id
          from public.match m
         where m.season_id = $1 and m.round = any($2::int[])
+          and coalesce(m.status_type, 'notstarted') = 'notstarted'
         order by m.round, m.start_ts`,
       [S, KO_ROUNDS],
     )
