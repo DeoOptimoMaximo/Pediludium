@@ -45,6 +45,8 @@ interface KoMatch {
   roundKey: 'r32' | 'r16' | 'qf' | 'sf' | 'final' | 'third';
   home: Ref;
   away: Ref;
+  /** finished tie: both teams known and the real winner propagates deterministically */
+  fixed?: { home: number; away: number; winner: number };
 }
 
 function parseRef(
@@ -100,6 +102,8 @@ interface Fixture {
   home: number;
   away: number;
   group: string;
+  /** actual [homeScore, awayScore] when the fixture is finished — used instead of sampling */
+  played?: [number, number];
 }
 
 /** Assign each best-third slot a qualifying group via eligibility-respecting matching (Kuhn). */
@@ -177,8 +181,12 @@ async function main(): Promise<void> {
     home_team_id: string;
     away_team_id: string;
     group_name: string;
+    status_type: string | null;
+    home_score: string | null;
+    away_score: string | null;
   }>(
-    `select home_team_id, away_team_id, group_name from public.match
+    `select home_team_id, away_team_id, group_name, status_type, home_score, away_score
+       from public.match
       where season_id = $1 and group_name is not null
         and home_team_id is not null and away_team_id is not null`,
     [S],
@@ -187,6 +195,10 @@ async function main(): Promise<void> {
     home: Number(f.home_team_id),
     away: Number(f.away_team_id),
     group: f.group_name.replace('Group ', '').trim(),
+    played:
+      f.status_type === 'finished' && f.home_score != null && f.away_score != null
+        ? [Number(f.home_score), Number(f.away_score)]
+        : undefined,
   }));
   const nameToId = new Map<string, number>();
   for (const t of await dbQuery<{ ss_id: string; name: string }>(
@@ -203,8 +215,14 @@ async function main(): Promise<void> {
     start_ts: string;
     h: string;
     a: string;
+    home_team_id: string | null;
+    away_team_id: string | null;
+    status_type: string | null;
+    home_score: string | null;
+    away_score: string | null;
   }>(
-    `select ss_id, round, start_ts, raw->'homeTeam'->>'name' as h, raw->'awayTeam'->>'name' as a
+    `select ss_id, round, start_ts, raw->'homeTeam'->>'name' as h, raw->'awayTeam'->>'name' as a,
+            home_team_id, away_team_id, status_type, home_score, away_score
        from public.match where season_id = $1 and round >= 5 order by round, start_ts`,
     [S],
   );
@@ -218,16 +236,60 @@ async function main(): Promise<void> {
     ssToNum.set(Number(r.ss_id), ROUND_NUM_START[key] + c);
     counters[key] = c + 1;
   }
+  // resolved slots come from home/away_team_id (authoritative; raw names can lag as
+  // placeholders when the tie was resolved via resolve:ko rather than a schedule refresh) —
+  // fall back to parsing the raw placeholder (W97 / 2A / 3C-3D…) only for open slots.
+  const nationalIds = new Set(teamNames.keys());
+  const pinnedOrRef = (idStr: string | null, rawName: string, num: number, side: 'home' | 'away'): Ref => {
+    const id = idStr == null ? null : Number(idStr);
+    if (id != null && nationalIds.has(id)) return { kind: 'team', id };
+    return parseRef(rawName, num, side, nameToId);
+  };
   const ko: KoMatch[] = koRows.map((r) => {
     const num = ssToNum.get(Number(r.ss_id))!;
     return {
       num,
       roundKey: ROUND_KEY[r.round]!,
-      home: parseRef(r.h, num, 'home', nameToId),
-      away: parseRef(r.a, num, 'away', nameToId),
+      home: pinnedOrRef(r.home_team_id, r.h, num, 'home'),
+      away: pinnedOrRef(r.away_team_id, r.a, num, 'away'),
     };
   });
   ko.sort((x, y) => x.num - y.num);
+  // condition on finished knockout ties: the real winner propagates with p=1. A knockout FT
+  // draw means penalties, whose winner isn't in the score — derive it from which of the two
+  // teams appears in a later round (excluding the 3rd-place match, which SF LOSERS feed).
+  const koByNum = new Map(ko.map((m) => [m.num, m]));
+  for (const r of koRows) {
+    const m = koByNum.get(ssToNum.get(Number(r.ss_id))!)!;
+    if (r.status_type !== 'finished' || m.home.kind !== 'team' || m.away.kind !== 'team') continue;
+    const hId = m.home.id;
+    const aId = m.away.id;
+    const hs = r.home_score == null ? null : Number(r.home_score);
+    const as = r.away_score == null ? null : Number(r.away_score);
+    if (hs == null || as == null) continue;
+    let winnerId: number | null = hs > as ? hId : hs < as ? aId : null;
+    if (winnerId == null) {
+      const appearsLater = (id: number) =>
+        koRows.some((o) => {
+          const on = ssToNum.get(Number(o.ss_id))!;
+          const ork = ROUND_KEY[o.round]!;
+          if (on <= m.num || (m.roundKey === 'sf' && ork === 'third')) return false;
+          return Number(o.home_team_id) === id || Number(o.away_team_id) === id;
+        });
+      if (appearsLater(hId) && !appearsLater(aId)) winnerId = hId;
+      else if (appearsLater(aId) && !appearsLater(hId)) winnerId = aId;
+    }
+    if (winnerId == null) {
+      console.warn(`[sim] finished KO match ${m.num} drawn with unknown winner — left simulated`);
+      continue;
+    }
+    m.fixed = { home: hId, away: aId, winner: winnerId };
+  }
+  const playedGroup = fixtures.filter((f) => f.played).length;
+  console.log(
+    `[sim] conditioning: ${playedGroup}/${fixtures.length} group fixtures played, ` +
+      `${ko.filter((m) => m.fixed).length}/${ko.length} knockout ties settled`,
+  );
   const thirdSlots = ko
     .flatMap((m) => [m.home, m.away])
     .filter((r): r is Extract<Ref, { kind: 'third' }> => r.kind === 'third')
@@ -247,6 +309,7 @@ async function main(): Promise<void> {
     return { lambda: Math.exp(ah - da + baseEdge + hb), mu: Math.exp(aa - dh + ab) };
   };
   const groupCdf = fixtures.map((f) => {
+    if (f.played) return null; // finished fixture: real score is used, no sampling
     const base = hostIds.has(f.home) ? fit.gamma : fit.gamma * GROUP_HOME_DAMP;
     const { lambda, mu } = goalRates(f.home, f.away, base);
     return buildCdf(dcScoreMatrix(lambda, mu, fit.rho));
@@ -302,7 +365,7 @@ async function main(): Promise<void> {
       for (const t of g.teams) table.set(t, { team: t, pts: 0, gd: 0, gf: 0, tb: rng() });
     for (let i = 0; i < fixtures.length; i++) {
       const f = fixtures[i]!;
-      const [hs, as] = sampleScore(groupCdf[i]!, rng);
+      const [hs, as] = f.played ?? sampleScore(groupCdf[i]!, rng);
       const H = table.get(f.home)!;
       const A = table.get(f.away)!;
       H.gf += hs;
@@ -386,6 +449,13 @@ async function main(): Promise<void> {
       if (rk) {
         bump(h, rk);
         bump(a, rk);
+      }
+      if (m.fixed) {
+        // tie already played in reality: propagate the actual winner, no sampling
+        winner.set(m.num, m.fixed.winner);
+        loser.set(m.num, m.fixed.winner === m.fixed.home ? m.fixed.away : m.fixed.home);
+        if (m.roundKey === 'final') bump(m.fixed.winner, 'champ');
+        continue;
       }
       // play (neutral venue): sample DC; settle a draw by a coin (penalties)
       const { lambda, mu } = goalRates(h, a, fit.gamma * KO_HOME_DAMP);
