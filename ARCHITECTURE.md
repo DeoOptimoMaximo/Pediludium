@@ -254,7 +254,8 @@ flowchart LR
 | `evs:{shard}` | precomputani EventDetail, shardano `event_id % 64` |
 | `mser:{shard}` | vremenske serije predikcija po utakmici, `match_id % 16` |
 | `tser:{teamId}` | vremenske serije izgleda turnira po momčadi |
-| `calib` | završene utakmice ocijenjene po modelu (Brier/log-loss) |
+| `calib` | završene utakmice ocijenjene po modelu (Brier/log-loss, uz `phase` grupe/knockout) |
+| `report` | završni obračun natjecanja: po fazi, vještina vs pogađanje, kalibracija, iznenađenja (`calib-report.ts`) |
 | `movers` | 24h delta izgleda prolaska/naslova po momčadi (`/movers`) |
 
 Sharding po modulu drži broj KV upisa malim (per-event ključevi bi koštali tisuće upisa).
@@ -300,6 +301,18 @@ to zatvaraju:
 | **Catch-up** | `src/ops.ts` + `should-sync.ts` | prozor provjere je **stanje utakmice**, ne zidni sat: neodigrana-a-započeta ostaje na redu do 14 dana, uz eskalirajući backoff po utakmici (15 min → 1 h → 6 h → 24 h) |
 | **Self-heal** | `scripts/supabase-guard.sh` | health izlazi kodom 2 kad baza padne → guard digne Docker/kontejnere → ponovna provjera; alarm ide tek ako oporavak ne uspije |
 | **Dead-man's switch** | `watchdog/` (Cloudflare Worker, cron 3 h) | čita KV `health` izvan Maca i javi ako prestane stizati — jedini sloj koji hvata „Mac je mrtav", jer sve gore radi na Macu |
+| **Freeze** | `src/should-refresh.ts` + `should-sync.ts` (docs/21 §3B) | arhivirana sezona ne generira posao; jobovi ostaju, gate se sam otvara za sljedeće natjecanje (§8.2) |
+
+### 8.2 Zamrznuta sezona (docs/21 §3B)
+
+Završeno natjecanje (`total > 0 && played >= total`, `ops.ts:isSeasonComplete`) prestaje
+generirati posao: `should-sync` i novi `should-refresh` skipaju, `should-publish` ionako nema
+promjene. Zamrznuti tick ne diže Chrome i ne troši ništa.
+
+**Jobovi se pritom ne gase** — isti launchd plan vozi sljedeće natjecanje bez ijedne izmjene,
+a gate se otvara sam čim postoji sezona s neodigranim utakmicama. Freeze pravilo namjerno traži
+`total > 0`: prazna sezona (0/0) inače bi se proglasila arhivom i zamrznula ingest tek
+onboardanog natjecanja prije nego što uopće počne.
 
 Ključna invarijanta: **liveness heartbeat piše `should-sync` na svakom ticku, i na SKIP-u**
 (tablica `ops_heartbeat`). Vezati ga uz stvarni dohvat značilo bi da završen turnir izgleda

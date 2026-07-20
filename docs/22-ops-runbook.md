@@ -26,6 +26,33 @@ launchctl list | grep pediludium          # provjera
 > **Zamka:** launchd preskače tickove dok Mac spava (na buđenju ih spoji u jedan). To je uredu i
 > očekivano — zato prag watchdoga i jest 12 h, a ne 1 h.
 
+### 1.1 Zamrznuta (arhivirana) sezona — trenutno stanje
+
+Od `docs/21` §3B sezona sa svih X/X odigranih utakmica **ne generira nikakav posao**. Jobovi se
+NE gase i ne treba ih ništa naknadno uključivati — samo nemaju što raditi. Zdrav tick sada
+izgleda ovako i to **nije kvar**:
+
+```
+[sync-gate] SKIP — sezona arhivirana (104/104 odigrano), nema više posla
+[refresh-gate] SKIP — sezona arhivirana (104/104 odigrano)
+[gate] SKIP — no match change since last publish (model drift only)
+```
+
+Tri gatea, tri razine: `should-sync` (Firecrawl rezultati), `should-refresh` (hourly
+`refresh --full`) i `should-publish` (KV). Zamrznuti tick traje ~1 s i ne diže Chrome.
+
+**Heartbeat se i dalje piše na svakom ticku, uključujući zamrznuti** — zato `npm run health`
+ostaje zelen (`ingest tick svjež`). Da je liveness vezan uz stvarni dohvat, arhivirana sezona
+izgledala bi identično mrtvom ingestu.
+
+**Odmrzavanje je automatsko.** Čim u bazi postoji sezona s neodigranim utakmicama, oba gatea se
+otvore sama. `should-refresh` je namjerno **fail-open**: ako baza zakaže, refresh se izvodi, jer
+je „tiho zamrznuta živa sezona" gori ishod od jednog suvišnog dohvata.
+
+> **Zamka za novo natjecanje:** freeze pravilo je `total > 0 && played >= total`. Prazna sezona
+> (0/0) se namjerno **ne** smatra arhiviranom — inače bi se tek onboardano natjecanje zamrznulo
+> prije prvog ingesta i nikad ne bi krenulo.
+
 ---
 
 ## 2. Notifikacije
@@ -163,6 +190,7 @@ zgrep 'ECONNREFUSED' ~/Library/Logs/pediludium/matchsync.log.1.gz | wc -l
 
 ## 6. Trošak u mirovanju
 
+Mjereno nakon §3B (2026-07-20): zamrznuti tick = **0 Firecrawl poziva, 0 KV upisa, bez Chromea**.
 Između natjecanja, sa zamrznutom sezonom: **≈ 0 Firecrawl kredita** (gate skipa), **≈ 0 KV upisa**
 (publish gate + health piše samo na promjenu statusa). Watchdog troši zanemarivo (8 cron poziva
 dnevno, upis u KV samo na prijelaz stanja). Jedini fiksni trošak je Mac koji vrti launchd.
