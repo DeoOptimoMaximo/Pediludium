@@ -165,7 +165,7 @@ uz postojeće u fetcher/).
 
 ---
 
-### ✅ §2 IZVRŠEN 2026-07-20 (Opus 4.8, branch `ops/resilience-s2`) — epilog i naučeno
+### ✅ §2 IZVRŠEN 2026-07-20 (Opus 4.8, `5c8fb90`+`6b7c4fd` → main `4d49797`) — epilog i naučeno
 
 Sustav sada ima alarm, sam se nadoknađuje i sam se popravlja. Ono što je iskočilo izvan
 pretpostavki prompta — bitno za §3/§4:
@@ -199,8 +199,21 @@ pretpostavki prompta — bitno za §3/§4:
 ironično baš jedan od izgubljenih QF-ova). Nakon vraćanja: digest `wc2026_match` **bit-identičan**
 (`c6cb0df6…` prije i poslije), `should-publish` SKIP, 63/63 testa, typecheck čist.
 
-**Ostalo otvoreno:** `HEALTH_NTFY_TOPIC` mora izabrati vlasnik (dijeljena tajna → samo `.env`);
-dok je prazan, health radi i loga, ali nema kome viknuti. Web banner čeka `npm run deploy`.
+6. **`fetcher/.env` se NIKAD nije učitavao.** Sve skripte se pokreću kao goli `node src/x.ts`,
+   pa je `.env` dosad bio čista dokumentacija — kod je živio na defaultima iz `config.ts`.
+   Bezopasno dok nije zatrebala prva prava tajna. Skripte kojima treba (`health`, `alert:test`,
+   `should-sync`) sad idu s `--env-file-if-exists=.env`; ostale namjerno nisu dirane da im se ne
+   podmetnu vrijednosti koje nikad nisu vidjele. **Provjeriti pri svakoj novoj env varijabli.**
+7. **Prvi pravi alarm nije prošao** — `Title` HTTP zaglavlje je ByteString, pa su hrvatski
+   dijakritici i emoji (`Pediludium 🔴`) bacali iznimku *unutar* `fetch`a, prije slanja. Sad se
+   ne-ASCII naslovi šalju kao RFC 2047 encoded-word (ntfy to dekodira), uz round-trip test.
+   Pouka: alarm koji nikad nije stvarno poslan ne postoji — testirati isporuku, ne samo logiku.
+
+**Zatvoreno:** `HEALTH_NTFY_TOPIC` generiran i upisan u `fetcher/.env` (dijeljena tajna, nikad u
+repo); testna i stvarna `db-down` poruka isporučene; mergeano na `main` (`4d49797`, pushano);
+web deployan (`ccc423da`) — `/`, `/scorecard`, `/bracket`, `/accuracy` sve 200, banner ispravno
+**nije** prikazan jer je sezona arhivirana. Health launchd job (`com.pediludium.health`) instaliran
+i vrti se svakih 30 min.
 
 ---
 
