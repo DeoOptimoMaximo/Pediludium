@@ -5,12 +5,14 @@ import { POSTS, postBySlug } from '@/lib/blog';
 import { fmtDay } from '@/lib/format';
 import { getDict } from '@/lib/lang';
 import { DrawParadox } from '../posts/draw-paradox';
+import { Wc2026FinalReckoning } from '../posts/wc2026-final-reckoning';
 
 export const dynamic = 'force-dynamic';
 
 // one renderer per slug — keeps post bodies as real components (live diagrams), not strings
 const RENDERERS: Record<string, (props: { lang: 'hr' | 'en' }) => React.ReactNode> = {
   'zasto-nijedna-predikcija-nije-remi': DrawParadox,
+  'kako-su-modeli-prosli-wc2026': Wc2026FinalReckoning,
 };
 
 export function generateStaticParams() {

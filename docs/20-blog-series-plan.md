@@ -63,7 +63,7 @@ Four tracks. Within each, posts are ordered by suggested publish priority. Statu
 | A1 | ▶ | Dixon-Coles, korak po korak / Dixon-Coles, step by step | Why a plain Poisson over/under-counts 0-0/1-0/0-1, and how the low-score correction τ + exponential time-decay weighting + weighted MLE fix it. | `fetcher/src/dixon-coles.ts`, `docs/01`, `docs/08`; commit `1d5f120` |
 | A2 | ◻ | Dva modela, jedan teren / Two models, one pitch | Elo+Poisson baseline vs Dixon-Coles: what each gets right, why we keep both and let the user switch. | `fetcher/src/predict.ts`, `docs/01` |
 | A3 | ◻ | Simuliramo cijeli turnir / Monte-Carlo the whole cup | Sampling 72 group games from the goal model, FIFA tie-breakers, best-8 thirds, reconstructing the 32-team bracket to a champion. | `fetcher/src/simulate.ts`, `docs/13`; commit `1d5f120` |
-| A4 | ◻ | Kalibracija > pogodak / Calibration beats the call | Brier & log-loss explained from zero; why "called the winner" is a vanity metric and the reliability diagram is the real exam. | `/accuracy`, `/scorecard`, `docs/08` |
+| A4 | ✅ | Završni obračun / Final reckoning — `kako-su-modeli-prosli-wc2026` | The WC2026 post-mortem: all 104 matches scored; the Elo baseline beat Dixon-Coles on the like-for-like set; the reliability diagram shows DC compressing everything toward the middle; the tournament's biggest miss was the draw-paradox post's own example fixture. | `/accuracy`, `calib-report.ts`, `docs/21` §3A |
 | A5 | ◻ | Rejting snage iz 10 godina / A power rating from 10 years | Goal-difference-weighted Elo built from a decade of match history; why the rating defaults to 1500 and what makes a team move. | `fetcher/src/predict.ts` (Elo loop), `team_match` table; this session's Elo-from-DB fix |
 | A6 | ◻ | Zagonetka trećeplasiranih / The third-place puzzle | The 48-team format: best 8 of 12 third-placed teams advance; modelling the cross-group cutoff. | groups page; commit `8e4c8fa` |
 
@@ -112,5 +112,3 @@ Four tracks. Within each, posts are ordered by suggested publish priority. Statu
 - New engineering worth a post → add a row in the right track rather than a loose TODO.
 - Keep tags consistent with `lib/blog.ts` (`Dixon-Coles`, `kalibracija`, `matematika`, …);
   add new tags sparingly.
-</content>
-</invoke>
