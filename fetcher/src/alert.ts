@@ -62,6 +62,18 @@ export function isDue(lastSentAt: string | undefined, now: number, cooldownH: nu
   return now - last >= cooldownH * 3600_000;
 }
 
+/**
+ * HTTP header values are ByteStrings — anything above U+00FF throws before the request is even
+ * sent. Our titles are Croatian and carry both diacritics and a status emoji, which killed every
+ * alert until the first end-to-end test surfaced it. ntfy decodes RFC 2047 encoded-words, so
+ * non-ASCII titles go over the wire base64'd. Exported for testing.
+ */
+export function encodeHeader(value: string): string {
+  // eslint-disable-next-line no-control-regex
+  if (/^[\x00-\x7F]*$/.test(value)) return value;
+  return `=?UTF-8?B?${Buffer.from(value, 'utf8').toString('base64')}?=`;
+}
+
 export interface AlertResult {
   sent: boolean;
   reason: 'sent' | 'cooldown' | 'not-configured' | 'failed';
@@ -93,7 +105,7 @@ export async function alert(
     const res = await fetch(`${SERVER}/${TOPIC}`, {
       method: 'POST',
       headers: {
-        Title: title,
+        Title: encodeHeader(title),
         Priority: opts.priority ?? 'high',
         Tags: opts.priority === 'low' ? 'white_check_mark' : 'rotating_light',
       },

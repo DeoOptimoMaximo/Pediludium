@@ -27,7 +27,7 @@ bash "$FETCHER_DIR/scripts/logrotate.sh"
 export SOFA_PROXY_SERVER
 
 echo "[$(date -u +%FT%TZ)] ===== health tick ====="
-node src/health.ts --defer-db-alert
+node --env-file-if-exists=.env src/health.ts --defer-db-alert
 HEALTH_RC=$?
 
 # Self-healing (docs/21 §2C): exit 2 means specifically "Postgres unreachable". Try to bring it
@@ -37,7 +37,7 @@ HEALTH_RC=$?
 if [ "$HEALTH_RC" -eq 2 ]; then
   bash "$FETCHER_DIR/scripts/supabase-guard.sh"
   echo "[$(date -u +%FT%TZ)] ponovna provjera nakon oporavka"
-  node src/health.ts
+  node --env-file-if-exists=.env src/health.ts
   HEALTH_RC=$?
 fi
 

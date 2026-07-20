@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isDue } from './alert.ts';
+import { encodeHeader, isDue } from './alert.ts';
 import { backoffMinutes } from './ops.ts';
 
 /**
@@ -40,6 +40,26 @@ describe('backoffMinutes — escalating per-match check cadence', () => {
     // 15 min indefinitely (~96 credits/day). Past the ladder it must cost at most a handful.
     const perDay = (24 * 60) / backoffMinutes(100);
     expect(perDay).toBeLessThanOrEqual(2);
+  });
+});
+
+describe('encodeHeader — RFC 2047 for non-ASCII alert titles', () => {
+  // Regression: every alert failed with "Cannot convert argument to a ByteString" because the
+  // titles are Croatian and carry a status emoji. Header values are latin1; fetch throws before
+  // the request leaves. Caught only by an actual end-to-end send, so it is pinned here.
+  it('leaves pure ASCII untouched', () => {
+    expect(encodeHeader('Pediludium db-down')).toBe('Pediludium db-down');
+  });
+
+  it('encodes diacritics and emoji so fetch can send them', () => {
+    for (const title of ['Pediludium 🔴 db', 'ne može do baze', 'Španjolska']) {
+      const encoded = encodeHeader(title);
+      expect(encoded).toMatch(/^=\?UTF-8\?B\?[A-Za-z0-9+/=]+\?=$/);
+      // eslint-disable-next-line no-control-regex
+      expect(/^[\x00-\xFF]*$/.test(encoded)).toBe(true); // now a valid ByteString
+      const b64 = encoded.slice('=?UTF-8?B?'.length, -'?='.length);
+      expect(Buffer.from(b64, 'base64').toString('utf8')).toBe(title); // round-trips
+    }
   });
 });
 

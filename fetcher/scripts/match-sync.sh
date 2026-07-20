@@ -8,11 +8,15 @@
 # just ended, so credits are spent on the handful of live games, not round the clock.
 #
 # Flow each tick:
-#   should-sync gate (cheap DB check: any match in [now-4h, now+15m] and not finished?)
-#     └─ yes → refresh:fc (Firecrawl, windowed to 4h) → if match reality changed (should-publish):
+#   should-sync gate (cheap DB check: any match kicked off, still unfinished, and past its
+#                     per-match backoff? — src/ops.ts)
+#     └─ yes → refresh:fc (Firecrawl) → if match reality changed (should-publish):
 #                 standings → predict:dc → predict:dcm → simulate → history:record → snapshot
 #     └─ no  → exit (0 credits, 0 work)
 # Result: a finished match shows up on the live site within ~15 min, with 2-3 in-play refreshes.
+#
+# Eligibility is match STATE, not wall clock (docs/21 §2B). The original [now-18h, now+15m]
+# window quietly abandoned anything played while the DB was down; catch-up is now the default.
 #
 # Shares the hourly job's lock so the two never recompute/publish concurrently.
 
@@ -36,7 +40,7 @@ bash "$FETCHER_DIR/scripts/logrotate.sh"
 # to print bare "[sync-gate] SKIP" straight to the log: 2 MB of undated lines, so reconstructing
 # WHEN the June/July outages started meant writing a script to carry the last dated line forward.
 # Every tick now leaves exactly one dated, greppable record of its outcome.
-GATE_OUT=$(node src/should-sync.ts 2>&1)
+GATE_OUT=$(node --env-file-if-exists=.env src/should-sync.ts 2>&1)
 GATE_RC=$?
 GATE_MSG=$(printf '%s\n' "$GATE_OUT" | tail -1)
 if [ "$GATE_RC" -ne 0 ]; then
