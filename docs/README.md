@@ -38,6 +38,8 @@ practices.
 | [18-edge-layer-visual.md](./18-edge-layer-visual.md) | Edge sloj — vizualni vodič (Mermaid) za svaki korak Web2↔Web3 odds/+EV/arbitraže |
 | [19-resilient-multi-transport-fetching.md](./19-resilient-multi-transport-fetching.md) | Otporna multi-transport arhitektura: residential/mobilni piggyback + rotirajući Firecrawl (odds + rezultati bez blokiranja) |
 | [20-blog-series-plan.md](./20-blog-series-plan.md) | Plan serije blogpostova — uređivačka načela + prioritizirani backlog tema iz dosadašnjeg znanja (modeli, data/infra, edge, proizvod) |
+| [21-post-wc-roadmap.md](./21-post-wc-roadmap.md) | Post-WC2026: dijagnoza tihog ispada, dugoročno upravljanje repoom i gotovi promptovi za dorade (§1–§6) |
+| [22-ops-runbook.md](./22-ops-runbook.md) | Operativni runbook: što se vrti, koji alarmi postoje, što napraviti kad koji pukne, poznata stanja Dockera |
 
 ## Tech stack (dogovoreno)
 
