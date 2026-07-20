@@ -299,6 +299,7 @@ to zatvaraju:
 | **Health/alert** | `src/health.ts`, launchd `com.pediludium.health` (30 min) | provjeri bazu, starost ingest heartbeata, zaglavljene utakmice, proxy, starost publisha → ntfy (cooldown 6 h/tip) + KV ključ `health` |
 | **Catch-up** | `src/ops.ts` + `should-sync.ts` | prozor provjere je **stanje utakmice**, ne zidni sat: neodigrana-a-započeta ostaje na redu do 14 dana, uz eskalirajući backoff po utakmici (15 min → 1 h → 6 h → 24 h) |
 | **Self-heal** | `scripts/supabase-guard.sh` | health izlazi kodom 2 kad baza padne → guard digne Docker/kontejnere → ponovna provjera; alarm ide tek ako oporavak ne uspije |
+| **Dead-man's switch** | `watchdog/` (Cloudflare Worker, cron 3 h) | čita KV `health` izvan Maca i javi ako prestane stizati — jedini sloj koji hvata „Mac je mrtav", jer sve gore radi na Macu |
 
 Ključna invarijanta: **liveness heartbeat piše `should-sync` na svakom ticku, i na SKIP-u**
 (tablica `ops_heartbeat`). Vezati ga uz stvarni dohvat značilo bi da završen turnir izgleda

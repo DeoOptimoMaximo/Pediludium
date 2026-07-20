@@ -215,6 +215,35 @@ web deployan (`ccc423da`) — `/`, `/scorecard`, `/bracket`, `/accuracy` sve 200
 **nije** prikazan jer je sezona arhivirana. Health launchd job (`com.pediludium.health`) instaliran
 i vrti se svakih 30 min.
 
+### ✅ §2E DODANO 2026-07-20 — dead-man's switch (rupa koju §2 nije pokrivao)
+
+§2 je riješio „nešto je puklo", ali ne i sloj ispod: **health check radi NA Macu.** Ako je Mac
+ugašen, trajno uspavan ili je launchd stao, ništa se ne izvrši, ništa se ne pošalje, a **tišina
+izgleda identično zdravlju** — točno oblik kvara koji je i sakrio 18 ispada. Čuvar ne smije
+živjeti u sustavu koji čuva.
+
+`watchdog/` = zaseban Cloudflare Worker (`pediludium-watchdog`), cron `0 */3 * * *`, čita KV ključ
+`health` koji Mac ionako piše i javi ako prestane biti osvježavan. Dijeli **nula** domene kvara s
+onim što nadzire: drugi stroj, druga mreža, drugo napajanje.
+
+Odluke koje nisu očite:
+- **Prag je 12 h, ne 1 h.** Mac legitimno spava noću i launchd tada ne okida — uski prag bi zvonio
+  svako jutro, a alarm koji svaki dan laže gori je od nikakvog (ista logika po kojoj je provjera
+  proxyja `warn`, nikad `red`). 12 h i dalje hvata „stroj se nije vratio" unutar jednog radnog dana.
+- **Zaseban worker, ne ruta u `pediludium-web`.** Čuvar koji se deploya zajedno s nadziranim
+  može biti srušen istim deployem. Uz to `workers_dev: false` i bez rute → dohvatljiv je isključivo
+  vlastitim cronom, pa ga se izvana ne može ni bockati ni natjerati da šalje poruke.
+- **Ne sudara se s publish diffom:** `publish-snapshot.ts` briše samo ključeve koje je sam prije
+  objavio (`.published-kv.json`); `health` i `watchdog:state` nisu u `kv-bulk.json` pa ostaju.
+
+Provjereno protiv produkcijskog KV-a i prave tajne (`wrangler dev --remote --test-scheduled`):
+normalno stanje → tiho; prag 0 h → alarm isporučen; povratak → poruka o oporavku (`priority: low`)
++ cooldown očišćen (`watchdog:state` ostaje samo `lastSeenAt`). 8 testova.
+
+**Preostala rupa (svjesno prihvaćena):** ako padne Cloudflare, nema čuvara nad čuvarom. Sljedeći
+sloj bi bio vanjski servis tipa healthchecks.io — nije uzeto jer bi uveo trećeg pružatelja radi
+scenarija bitno manje vjerojatnog od „Mac je ugašen".
+
 ---
 
 ## 3. PROMPT — Arhiviranje WC2026: završni račun turnira
