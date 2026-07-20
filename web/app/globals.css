@@ -499,3 +499,21 @@ tr.hl-cro td.name { font-weight: 800; }
 
 .br-third { margin-top: 20px; border-top: 1px dashed var(--line); padding-top: 10px; }
 .br-third .br-col-hd { border-bottom-color: var(--line); color: var(--muted); margin-bottom: 8px; position: static; }
+
+/* Stale-data strip (docs/21 §2A) — shown only when played matches are missing results.
+   Deliberately understated: it informs, it does not alarm. Uses --warn so it reads as a
+   notice in both themes without competing with the tricolour brand accent. */
+.health-banner {
+  max-width: 1080px;
+  /* sits outside .container, so it reproduces the container's 18px gutter itself */
+  width: calc(100% - 36px);
+  margin: 0 auto 14px;
+  padding: 8px 14px;
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warn) 10%, var(--bg));
+  color: var(--warn);
+  font-size: .84rem;
+  font-weight: 600;
+  line-height: 1.4;
+}

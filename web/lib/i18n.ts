@@ -22,6 +22,7 @@ export interface Dict {
     note: string;
   };
   blog: { title: string; sub: string; minRead: string; back: string };
+  health: { stale: (count: number, at: Date) => string };
   ui: { toDark: string; toLight: string; toWide: string; toBoxed: string };
   common: {
     live: string;
@@ -212,6 +213,11 @@ export const T: Record<Lang, Dict> = {
     },
     countdown: ['DANA', 'SATI', 'MIN', 'SEK'],
     ticker: { connecting: 'povezivanje…', none: 'nema utakmica uživo', live: (n) => `● ${n} uživo` },
+    health: {
+      stale: (count, at) =>
+        `Podaci kasne: ${count} odigran${count === 1 ? 'a utakmica' : 'e utakmice'} još ${count === 1 ? 'čeka' : 'čekaju'} rezultat. ` +
+        `Zadnja provjera ${at.toUTCString().slice(5, 22)} UTC.`,
+    },
     homePage: {
       kicker: 'Svjetsko prvenstvo 2026. · SAD · Kanada · Meksiko',
       tagline:
@@ -389,6 +395,11 @@ export const T: Record<Lang, Dict> = {
     },
     countdown: ['D', 'H', 'M', 'S'],
     ticker: { connecting: 'connecting…', none: 'no matches live', live: (n) => `● ${n} live now` },
+    health: {
+      stale: (count, at) =>
+        `Data is behind: ${count} played match${count === 1 ? '' : 'es'} still awaiting a result. ` +
+        `Last checked ${at.toUTCString().slice(5, 22)} UTC.`,
+    },
     homePage: {
       kicker: 'FIFA World Cup 2026 · USA · Canada · Mexico',
       tagline:

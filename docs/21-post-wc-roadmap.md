@@ -165,6 +165,45 @@ uz postojeće u fetcher/).
 
 ---
 
+### ✅ §2 IZVRŠEN 2026-07-20 (Opus 4.8, branch `ops/resilience-s2`) — epilog i naučeno
+
+Sustav sada ima alarm, sam se nadoknađuje i sam se popravlja. Ono što je iskočilo izvan
+pretpostavki prompta — bitno za §3/§4:
+
+1. **Ispad nije bio jedan, nego OSAMNAEST.** Rekonstrukcija `matchsync.log` (skripta koja
+   nosi zadnji datirani redak naprijed, jer SKIP linije nisu imale datum) pokazuje ispade
+   baze od 18.6. do 18.7.: 15.2 h (24.6.), 9.0 h (29.6.), 8.2 h (1.7.), **20.8 h (4.–5.7.)**
+   i konačno ~6 dana od 9.7. Onaj od 4.7. je izravno objašnjenje zašto nedostaju **baš dva
+   osmine finala** (Norveška–Brazil 5.7., Engleska–Meksiko 6.7.) — docs/21 §0 je to vodio
+   kao zasebnu „rupu u logu". Nije bila zasebna: ista bolest, raniji napad.
+2. **Uzorak je noćni, ne „netko je ugasio Docker".** Većina epizoda počinje kasno navečer i
+   traje 8–20 h uz **launchd tickove koji uredno rade** (exit 0, ECONNREFUSED). To je potpis
+   *dark wakea*: Mac se budi taman toliko da launchd opali, Docker VM nije podignut, veza
+   odbijena, natrag u san. Uz to je uključen Resource Saver (`UseResourceSaver=true`, 300 s).
+3. **„Uključi Docker start at login" NIJE bilo rješenje** — `settings-store.json` na ovom
+   stroju ima `AutoStart=False` uz `AutoStartError: "operation is not permitted when
+   registering app service"`: macOS odbija registraciju login itema, postavka je mrtva.
+   Zato oporavak živi u repou (`scripts/supabase-guard.sh`), a ne u tuđim preferencama.
+   Provjereno: kontejner ugašen → guard ga vratio u **5 s**, health opet zelen.
+4. **Liveness heartbeat NE smije visjeti o `refresh:fc`.** Prva verzija je tako radila i bila
+   bi trajno crvena čim sezona završi (nema što dohvatiti → nema heartbeata → „ingest je
+   mrtav"). Sada beat piše `should-sync` na svakom ticku, i na SKIP: jedini signal koji
+   ostaje svjež u zdravom, mirnom sustavu. Ista logika i za banner na webu — crven zbog
+   arhivirane sezone znači da ga nitko neće gledati.
+5. **Alarm koji se sam popravi nije alarm.** `health.ts --defer-db-alert` (prvi prolaz) izlazi
+   s kodom 2 umjesto da odmah zove; tek ako guard ne uspije, drugi prolaz šalje poruku.
+   Ručni `npm run health` alarmira odmah.
+
+**Regresija (crvena linija):** utakmica odigrana prije 221 h s obrisanim rezultatom — stara
+18h logika je vidi **0 puta**, nova je odmah stavlja na red (`PROCEED — Spain v Belgium`,
+ironično baš jedan od izgubljenih QF-ova). Nakon vraćanja: digest `wc2026_match` **bit-identičan**
+(`c6cb0df6…` prije i poslije), `should-publish` SKIP, 63/63 testa, typecheck čist.
+
+**Ostalo otvoreno:** `HEALTH_NTFY_TOPIC` mora izabrati vlasnik (dijeljena tajna → samo `.env`);
+dok je prazan, health radi i loga, ali nema kome viknuti. Web banner čeka `npm run deploy`.
+
+---
+
 ## 3. PROMPT — Arhiviranje WC2026: završni račun turnira
 
 **Analiza:** turnir je gotov — season 58210 prelazi iz „live" u „arhiva". To je i prilika

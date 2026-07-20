@@ -36,7 +36,9 @@
     "format": "prettier --write .",
     "edge:supersport": "node src/edge-supersport.ts",
     "edge:sofascore": "node src/edge-sofascore-odds.ts",
-    "refresh:fc": "node src/refresh-firecrawl.ts"
+    "refresh:fc": "node src/refresh-firecrawl.ts",
+    "health": "node src/health.ts",
+    "alert:test": "node src/alert.ts"
   },
   "dependencies": {
     "pg": "^8.21.0",
