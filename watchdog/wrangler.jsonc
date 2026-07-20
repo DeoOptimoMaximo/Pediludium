@@ -1,0 +1,29 @@
+// Dead-man's switch for the home pipeline (docs/21 §2E).
+// Deliberately a SEPARATE worker from pediludium-web: a watchdog that ships with the thing it
+// watches can be broken by the same deploy. This one has no route and no workers.dev URL — it is
+// reachable only by its cron trigger, so it cannot be poked (or spammed into sending alerts)
+// from outside. The fetch handler exists for `wrangler dev` only.
+{
+  "$schema": "../web/node_modules/wrangler/config-schema.json",
+  "name": "pediludium-watchdog",
+  "account_id": "7dc7167b7e2e00923bfa7cd697df14e4", // D.O.M. (same account as the web worker)
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-01",
+  "workers_dev": false,
+  "triggers": {
+    // Every 3h against a 12h staleness threshold: four independent chances to notice before the
+    // window closes, so one failed invocation doesn't delay the alert by a whole cycle.
+    "crons": ["0 */3 * * *"]
+  },
+  "kv_namespaces": [
+    {
+      // Read-only in spirit: reads `health`, writes only its own `watchdog:state` key.
+      "binding": "SNAPSHOT",
+      "id": "7b0c159c53f14f868fd6504dae5d94ba"
+    }
+  ],
+  "vars": {
+    "STALE_H": "12"
+  },
+  "observability": { "enabled": true }
+}
