@@ -120,6 +120,9 @@ export type TeamSeries = Record<string, TeamSeriesPoint[]>;
 export interface CalibRow {
   match_id: number;
   kickoff: string;
+  /** 'group' while group_name is set, 'ko' for every knockout tie. Optional: snapshots
+   *  published before the WC2026 final reckoning (docs/21 §3A) carry no phase marker. */
+  phase?: 'group' | 'ko';
   p: [number, number, number]; // home / draw / away
   outcome: 0 | 1 | 2; // index into p
   brier: number; // multiclass, 0 best … 2 worst (uniform guess: 0.667)
@@ -127,6 +130,57 @@ export interface CalibRow {
 }
 /** model_version → rows ordered by kickoff */
 export type Calibration = Record<string, CalibRow[]>;
+
+/* ── final reckoning (docs/21 §3A) ────────────────────────────────────────
+ * Precomputed by fetcher/src/calib-report.ts once a competition is complete. Mirror of
+ * the FinalReport interface there — every aggregate carries its own n, because models
+ * scored on different subsets must never be compared without saying so. */
+
+export interface CalibAggregate {
+  n: number;
+  brier: number;
+  logloss: number;
+}
+export interface ReliabilityBin {
+  lo: number;
+  hi: number;
+  n: number;
+  predicted: number;
+  observed: number;
+}
+export interface SurpriseRow {
+  match_id: number;
+  kickoff: string;
+  outcome: 0 | 1 | 2;
+  p_actual: number;
+}
+export interface ModelReport {
+  version: string;
+  overall: CalibAggregate;
+  group: CalibAggregate | null;
+  ko: CalibAggregate | null;
+  /** 1 − brier/naive; 0 = no better than guessing, negative = worse */
+  skill: number;
+  reliability: ReliabilityBin[];
+  surprises: SurpriseRow[];
+}
+export interface CalibSubset {
+  n: number;
+  brier: Record<string, number>;
+  logloss: Record<string, number>;
+}
+export interface FinalReport {
+  generated_at: string;
+  season_id: number;
+  season: { played: number; total: number };
+  /** every match played — the trigger for showing the report instead of a running tally */
+  complete: boolean;
+  matches: number;
+  naive: CalibAggregate;
+  models: ModelReport[];
+  common: CalibSubset | null;
+  vsMarket: CalibSubset | null;
+}
 
 /* ── biggest movers: change in advance / title odds over a recent window ───── */
 export interface MoverRow {
@@ -160,14 +214,22 @@ export interface Health {
 // model_version identifiers used across the app (the schema versions predictions/sims)
 export const BASELINE_MODEL = 'baseline-poisson-elo-v1';
 export const DC_MODEL = 'dixon-coles-v1';
+export const DCM_MODEL = 'dc-market-v1';
 export const SIM_MODEL = 'mc-sim-v1';
+/** The bookmaker scored as a model — see fetcher/src/export-snapshot.ts. */
+export const MARKET_MODEL = 'market-implied';
 
+export type PredModelKey = 'dc' | 'baseline' | 'dcm' | 'market';
 export interface PredModel {
-  key: 'dc' | 'baseline';
+  key: PredModelKey;
   version: string;
   label: string;
 }
-export const PRED_MODELS: Record<'dc' | 'baseline', PredModel> = {
+/** Consumers pick entries explicitly by key — nothing iterates this record, so adding
+ *  report-only models (dcm, market) leaves /predictions and /match untouched. */
+export const PRED_MODELS: Record<PredModelKey, PredModel> = {
   dc: { key: 'dc', version: DC_MODEL, label: 'Dixon-Coles' },
   baseline: { key: 'baseline', version: BASELINE_MODEL, label: 'Elo + Poisson' },
+  dcm: { key: 'dcm', version: DCM_MODEL, label: 'DC × tržište' },
+  market: { key: 'market', version: MARKET_MODEL, label: 'Tržište (kvote)' },
 };

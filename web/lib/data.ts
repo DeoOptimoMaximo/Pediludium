@@ -30,6 +30,14 @@ export const getTeamSeries = impl.getTeamSeries;
 export const getCalibration = impl.getCalibration;
 export const getMovers = impl.getMovers;
 
+/**
+ * End-of-competition report (docs/21 §3A). Precomputed at export time, so — like health —
+ * it only exists in snapshot mode; local dev falls back to the running per-match scorecard.
+ */
+export const getReport: () => Promise<import('./types').FinalReport | null> = isSnapshot
+  ? snapshot.getReport
+  : async () => null;
+
 /** Snapshot generation time, or null when reading live from Supabase. */
 export const getSnapshotMeta: () => Promise<{ generated_at: string } | null> = isSnapshot
   ? snapshot.getSnapshotMeta

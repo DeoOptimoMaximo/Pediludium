@@ -207,7 +207,7 @@ export async function getTeamSeries(teamId: number): Promise<import('./types').T
 export async function getCalibration(): Promise<import('./types').Calibration> {
   const { data: finished, error: e1 } = await supa()
     .from('wc2026_match')
-    .select('ss_id, start_ts, home_score, away_score')
+    .select('ss_id, start_ts, home_score, away_score, group_name')
     .eq('status_type', 'finished')
     .not('home_score', 'is', null);
   if (e1) throw e1;
@@ -237,6 +237,7 @@ export async function getCalibration(): Promise<import('./types').Calibration> {
     (out[h.model_version] ??= []).push({
       match_id: h.match_id,
       kickoff: m.start_ts,
+      phase: m.group_name != null ? 'group' : 'ko', // knockout ties carry no group
       p,
       outcome,
       brier: Math.round(brier * 10000) / 10000,

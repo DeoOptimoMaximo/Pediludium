@@ -163,6 +163,25 @@ export interface Dict {
     th: { date: string; match: string; pred: string; outcome: string; surprise: string; brier: string; logloss: string };
     outcomeName: (o: 0 | 1 | 2) => string;
     surpriseNote: string;
+    report: {
+      title: string;
+      sub: (played: number) => string;
+      th: { model: string; n: string; brier: string; logloss: string; skill: string; group: string; ko: string };
+      skillNote: string;
+      commonTitle: string;
+      commonNote: (n: number) => string;
+      marketTitle: string;
+      marketNote: (n: number) => string;
+      relTitle: string;
+      relNote: string;
+      relPredicted: string;
+      relObserved: string;
+      relCaption: (model: string) => string;
+      surprisesTitle: string;
+      surprisesNote: string;
+      caveatsTitle: string;
+      caveats: string[];
+    };
   };
 }
 
@@ -185,7 +204,7 @@ export const T: Record<Lang, Dict> = {
       tbd: 'Još neodređeno',
       winnerOf: (a, b) => `Pobjednik ${a}/${b}`,
       ft: 'Kraj',
-      note: 'Parovi i rezultati sa SofaScorea; kasniji se krugovi popunjavaju automatski kako pobjednici budu poznati. Klik na utakmicu otvara detalje i predikciju.',
+      note: 'Kasniji se krugovi popunjavaju automatski kako pobjednici budu poznati. Klik na utakmicu otvara detalje i predikciju.',
     },
     blog: {
       title: 'Blog — tehničke analize',
@@ -347,6 +366,34 @@ export const T: Record<Lang, Dict> = {
       outcomeName: (o) => (o === 0 ? '1 (domaćin)' : o === 1 ? 'X (neriješeno)' : '2 (gost)'),
       surpriseNote:
         'Boja retka pokazuje koliko se stvarni ishod razlikuje od predikcije: zeleno = model je stvarnom ishodu dao visoku vjerojatnost (očekivano), crveno = nisku (iznenađenje). Postotak je vjerojatnost koju je model dao onome što se zaista dogodilo.',
+      report: {
+        title: 'Završni obračun turnira',
+        sub: (played) =>
+          `Turnir je odigran do kraja — svih ${played} utakmica ocijenjeno. Ovo je konačni račun: koliko je koji model stvarno znao, gdje je pogriješio i je li uopće bio bolji od pogađanja.`,
+        th: { model: 'Model', n: 'n', brier: 'Brier', logloss: 'Log-loss', skill: 'Vještina', group: 'Grupe', ko: 'Knockout' },
+        skillNote:
+          'Vještina = koliko je model bolji od nasumičnog pogađanja (0 = nimalo, 1 = savršeno, ispod 0 = gori od pogađanja). Stupci „Grupe" i „Knockout" su Brier unutar te faze.',
+        commonTitle: 'Pošteno, jedan prema jedan',
+        commonNote: (n) =>
+          `Gornja tablica uspoređuje modele na različitim skupovima utakmica — dc-market-v1 uveden je usred turnira, pa ima manje predikcija. Ovdje su svi ocijenjeni na istih ${n} utakmica koje su svi predviđali. Ovo je jedina brojka po kojoj ih se smije rangirati.`,
+        marketTitle: 'Protiv kladionice',
+        marketNote: (n) =>
+          `Kvote su ocijenjene isto kao i model — zamrznute prije početka, preračunate u vjerojatnosti. Uzorak je mršav (${n} utakmica, sve iz grupne faze) jer nam je dohvat kvota otpao rano u turniru, pa je ovo indikacija, ne presuda.`,
+        relTitle: 'Kalibracija — znači li 30% zaista 30%',
+        relNote:
+          'Svaka predikcija daje tri vjerojatnosti (1, X, 2). Grupirane su po visini i uspoređene sa stvarnom učestalošću. Točka na isprekidanoj dijagonali = savršeno kalibrirano. Iznad = model je bio prestrašljiv, ispod = presamouvjeren. Veličina točke = koliko je predikcija u toj skupini.',
+        relPredicted: 'predviđeno',
+        relObserved: 'stvarno',
+        relCaption: (model) => `Kalibracija — ${model}`,
+        surprisesTitle: 'Najveća iznenađenja',
+        surprisesNote: 'Utakmice kojima je model dao najnižu vjerojatnost onome što se na kraju dogodilo.',
+        caveatsTitle: 'Što s ovim brojkama nije u redu',
+        caveats: [
+          'Simulacijska povijest (izgledi za naslov kroz turnir) bila je DJELOMIČNO NEKONDICIONIRANA: slotovi knockouta pinali su se iz sirovih imena momčadi, koja su ostajala ustajala dok je mobilni proxy bio mrtav, a odigrane knockout utakmice simulirale su se iznova. Popravljeno je tek 20. srpnja 2026., nakon finala. Predikcije po utakmici (ova stranica) time nisu zahvaćene — one se zamrzavaju prije početka i nikad se ne prepisuju — ali serije izgleda za naslov iz sredine turnira treba čitati s rezervom.',
+          'Baza je kroz turnir imala 18 tihih ispada (najdulji ~6 dana), pa neke utakmice nisu dobile predikciju u zadnjem satu prije početka; za njih je ocijenjena zadnja ranija zamrznuta predikcija.',
+          'Uzorak je 104 utakmice. Razlika u Brieru od nekoliko tisućinki između modela nije statistički značajna i ne treba je čitati kao poredak.',
+        ],
+      },
     },
   },
   en: {
@@ -367,7 +414,7 @@ export const T: Record<Lang, Dict> = {
       tbd: 'To be decided',
       winnerOf: (a, b) => `Winner ${a}/${b}`,
       ft: 'FT',
-      note: 'Fixtures and results from SofaScore; later rounds fill in automatically as winners are decided. Tap a match for details and the prediction.',
+      note: 'Later rounds fill in automatically as winners are decided. Tap a match for details and the prediction.',
     },
     blog: {
       title: 'Blog — technical write-ups',
@@ -529,6 +576,34 @@ export const T: Record<Lang, Dict> = {
       outcomeName: (o) => (o === 0 ? '1 (home)' : o === 1 ? 'X (draw)' : '2 (away)'),
       surpriseNote:
         'Row colour shows how far the actual outcome was from the prediction: green = the model gave the actual result a high probability (expected), red = a low one (a surprise). The percentage is the probability the model assigned to what actually happened.',
+      report: {
+        title: 'Final reckoning',
+        sub: (played) =>
+          `The tournament is over — all ${played} matches scored. This is the final account: how much each model actually knew, where it was wrong, and whether it beat guessing at all.`,
+        th: { model: 'Model', n: 'n', brier: 'Brier', logloss: 'Log-loss', skill: 'Skill', group: 'Groups', ko: 'Knockout' },
+        skillNote:
+          'Skill = how much better than random guessing (0 = not at all, 1 = perfect, below 0 = worse than guessing). The “Groups” and “Knockout” columns are the Brier score within that phase.',
+        commonTitle: 'Like for like',
+        commonNote: (n) =>
+          `The table above compares models scored on different sets of matches — dc-market-v1 was introduced mid-tournament, so it has fewer predictions. Here they are all scored on the same ${n} matches that every one of them predicted. This is the only number you may rank them by.`,
+        marketTitle: 'Against the bookmaker',
+        marketNote: (n) =>
+          `The odds are scored exactly like a model — frozen before kick-off, converted to probabilities. The sample is thin (${n} matches, all from the group stage) because our odds feed dropped out early in the tournament, so treat this as an indication, not a verdict.`,
+        relTitle: 'Calibration — does 30% really mean 30%',
+        relNote:
+          'Every prediction gives three probabilities (1, X, 2). They are bucketed by size and compared against how often they actually happened. A point on the dashed diagonal = perfectly calibrated. Above it the model was too timid, below it too confident. Dot size = how many predictions sit in that bucket.',
+        relPredicted: 'predicted',
+        relObserved: 'observed',
+        relCaption: (model) => `Calibration — ${model}`,
+        surprisesTitle: 'Biggest surprises',
+        surprisesNote: 'The matches where the model gave the lowest probability to what actually happened.',
+        caveatsTitle: 'What is wrong with these numbers',
+        caveats: [
+          'The simulation history (title odds through the tournament) was PARTIALLY UNCONDITIONED: knockout slots were pinned from raw team names, which went stale while the mobile proxy was dead, and knockout matches already played were re-simulated. This was only fixed on 20 July 2026, after the final. The per-match predictions on this page are unaffected — those are frozen before kick-off and never overwritten — but mid-tournament title-odds series should be read with caution.',
+          'The database suffered 18 silent outages during the tournament (the longest ~6 days), so some matches got no prediction in the final hour before kick-off; for those, the last earlier frozen prediction was scored.',
+          'The sample is 104 matches. A Brier difference of a few thousandths between models is not statistically significant and should not be read as a ranking.',
+        ],
+      },
     },
   },
 };
