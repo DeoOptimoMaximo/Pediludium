@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { closeDb, dbQuery } from './db.ts';
 import { WORLD_CUP } from './config.ts';
+import { type ScoredRow, buildFinalReport } from './calib-report.ts';
 
 /**
  * Snapshot exporter — dumps every query the web app runs (web/lib/data.ts) into JSON
@@ -244,11 +245,33 @@ async function exportTeamSeries(): Promise<Record<string, Record<string, SeriesP
 
 /** Per finished match & model: the last pre-kickoff prediction scored against the
  * actual result (multiclass Brier + log-loss). The web only aggregates/renders. */
+/**
+ * The bookmaker scored as if it were one more model. `match_odds.imp_*` are already
+ * de-vigged to sum 1, but we renormalise defensively — a row whose three legs don't
+ * form a distribution would silently poison the Brier average otherwise.
+ *
+ * Coverage is thin and NOT a fair head-to-head: enrich (the only path that ever wrote
+ * match_odds) died with the SofaScore challenge, so we have prematch odds for a dozen
+ * group matches and none at all from the knockout. The web surfaces the row count next
+ * to the number for exactly this reason — see docs/21 §3A.
+ */
+export const MARKET_MODEL_VERSION = 'market-implied';
+
+/** Multiclass Brier + log-loss for a 3-way distribution against the realised outcome. */
+function scoreTriplet(p: number[], outcome: number): { brier: number; logloss: number } {
+  const brier = p.reduce((s, pi, i) => s + (pi - (i === outcome ? 1 : 0)) ** 2, 0);
+  return { brier, logloss: -Math.log(Math.max(p[outcome]!, 1e-9)) };
+}
+
+const outcomeOf = (home: number, away: number) => (home > away ? 0 : home < away ? 2 : 1);
+const round4 = (v: number) => Math.round(v * 10000) / 10000;
+
 async function exportCalibration(): Promise<Record<string, unknown[]>> {
   const rows = await dbQuery<{
     model_version: string;
     match_id: number;
     start_ts: string | Date; // node-pg returns timestamptz as a Date
+    group_name: string | null;
     home_score: number;
     away_score: number;
     p_home: number | null;
@@ -256,7 +279,7 @@ async function exportCalibration(): Promise<Record<string, unknown[]>> {
     p_away: number | null;
   }>(
     `select distinct on (h.match_id, h.model_version)
-            h.model_version, h.match_id, m.start_ts, m.home_score, m.away_score,
+            h.model_version, h.match_id, m.start_ts, m.group_name, m.home_score, m.away_score,
             h.p_home, h.p_draw, h.p_away
        from public.prediction_history h
        join public.match m on m.ss_id = h.match_id
@@ -265,25 +288,89 @@ async function exportCalibration(): Promise<Record<string, unknown[]>> {
         and h.captured_at <= m.start_ts
       order by h.match_id, h.model_version, h.captured_at desc`,
   );
+
+  // The market, scored on the same frozen-before-kickoff basis: status_at_fetch tells us
+  // the quote really was prematch, so a post-hoc odds row can never sneak in as foresight.
+  const marketRows = await dbQuery<{
+    match_id: number;
+    start_ts: string | Date;
+    group_name: string | null;
+    home_score: number;
+    away_score: number;
+    imp_home: number | null;
+    imp_draw: number | null;
+    imp_away: number | null;
+  }>(
+    `select o.match_id, m.start_ts, m.group_name, m.home_score, m.away_score,
+            o.imp_home, o.imp_draw, o.imp_away
+       from public.match_odds o
+       join public.match m on m.ss_id = o.match_id
+      where m.status_type = 'finished'
+        and m.home_score is not null and m.away_score is not null
+        and o.status_at_fetch = 'notstarted'
+        and o.imp_home is not null and o.imp_draw is not null and o.imp_away is not null`,
+  );
+
   const out: Record<string, unknown[]> = {};
-  for (const r of rows) {
-    const p = [r.p_home ?? 0, r.p_draw ?? 0, r.p_away ?? 0];
-    const outcome = r.home_score > r.away_score ? 0 : r.home_score < r.away_score ? 2 : 1;
-    const brier = p.reduce((s, pi, i) => s + (pi - (i === outcome ? 1 : 0)) ** 2, 0);
-    const logloss = -Math.log(Math.max(p[outcome]!, 1e-9));
-    (out[r.model_version] ??= []).push({
+
+  const push = (
+    model: string,
+    r: { match_id: number; start_ts: string | Date; group_name: string | null; home_score: number; away_score: number },
+    p: number[],
+  ) => {
+    const outcome = outcomeOf(r.home_score, r.away_score);
+    const { brier, logloss } = scoreTriplet(p, outcome);
+    (out[model] ??= []).push({
       match_id: Number(r.match_id), // node-pg returns bigint as string; keep it a number like core.matches.ss_id
       kickoff: r.start_ts instanceof Date ? r.start_ts.toISOString() : r.start_ts,
-      p: p.map((v) => Math.round(v * 10000) / 10000),
+      // group_name is null for every knockout tie — the only phase marker the schema carries
+      phase: r.group_name != null ? 'group' : 'ko',
+      p: p.map(round4),
       outcome,
-      brier: Math.round(brier * 10000) / 10000,
-      logloss: Math.round(logloss * 10000) / 10000,
+      brier: round4(brier),
+      logloss: round4(logloss),
     });
+  };
+
+  for (const r of rows) push(r.model_version, r, [r.p_home ?? 0, r.p_draw ?? 0, r.p_away ?? 0]);
+
+  for (const r of marketRows) {
+    const raw = [r.imp_home ?? 0, r.imp_draw ?? 0, r.imp_away ?? 0];
+    const sum = raw.reduce((s, v) => s + v, 0);
+    if (sum <= 0) continue;
+    push(MARKET_MODEL_VERSION, r, raw.map((v) => v / sum));
   }
+
   for (const rowsOf of Object.values(out)) {
     (rowsOf as { kickoff: string }[]).sort((a, b) => a.kickoff.localeCompare(b.kickoff));
   }
   return out;
+}
+
+/* ── final reckoning ─────────────────────────────────────────────────────
+ * The tournament-end report (docs/21 §3A): per-model, per-phase scores, calibration
+ * and the biggest misses. Aggregation lives in calib-report.ts (pure + tested); this
+ * function only supplies the data and the season's completion state, which is what
+ * tells the web it is looking at an archive rather than a competition in progress. */
+
+async function exportFinalReport(
+  generatedAt: string,
+  calibration: Record<string, unknown[]>,
+): Promise<Record<string, unknown>> {
+  const season = await jsonOne<{ played: number; total: number }>(
+    `select json_build_object(
+              'played', count(*) filter (where status_type = 'finished'),
+              'total', count(*)) as j
+       from public.match where season_id = ${WORLD_CUP.seasonId2026}`,
+  );
+
+  return {
+    generated_at: generatedAt,
+    season_id: WORLD_CUP.seasonId2026,
+    season,
+    complete: season.total > 0 && season.played === season.total,
+    ...buildFinalReport(calibration as Record<string, ScoredRow[]>),
+  };
 }
 
 /* ── biggest movers ──────────────────────────────────────────────────────
@@ -411,6 +498,7 @@ async function main(): Promise<void> {
   const matchSeries = await exportMatchSeries();
   const teamSeries = await exportTeamSeries();
   const calibration = await exportCalibration();
+  const report = await exportFinalReport(generatedAt, calibration);
   const movers = await exportMovers();
   const edge = await exportEdge(generatedAt);
 
@@ -427,6 +515,7 @@ async function main(): Promise<void> {
     ...Object.entries(matchSeries).map(([s, j]) => ({ key: `mser:${s}`, value: JSON.stringify(j) })),
     ...Object.entries(teamSeries).map(([id, j]) => ({ key: `tser:${id}`, value: JSON.stringify(j) })),
     { key: 'calib', value: JSON.stringify(calibration) },
+    { key: 'report', value: JSON.stringify(report) },
     { key: 'movers', value: JSON.stringify(movers) },
     { key: 'edge', value: JSON.stringify(edge) },
   ];

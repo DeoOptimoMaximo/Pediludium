@@ -280,6 +280,70 @@ pokazuje 0 Firecrawl poziva; blog post objavljen na /blog.
 
 ---
 
+### ✅ §3 IZVRŠEN 2026-07-20 (Opus 4.8, `f2d934d`+`264445f`+`a5d0fb3`) — epilog i naučeno
+
+Sva tri dijela isporučena i na produkciji: `/accuracy` nosi završni obračun, oba joba su
+čisti no-op, blog post živi na `/blog/kako-su-modeli-prosli-wc2026`. Publish: **4 KV upisa
+od 181 ključa** (`report` nov, `calib` dobio `phase`), web deployan (`8e9678b5`).
+
+**1. Model je pao na vlastitom ispitu — i to je glavni nalaz.** Na poštenom skupu (istih 97
+utakmica koje su svi predviđali) **Elo+Poisson 0.5705 < dc-market 0.5726 < Dixon-Coles
+0.5799**. Najjednostavniji model u projektu nadmašio je onaj u koji je uloženo najviše
+matematike. Razlika (0.009) jest unutar šuma na 104 utakmice i tako je i objavljena, ali
+smjer objašnjava kalibracija: DC je **239 od 312** vjerojatnosti smjestio u pojas 20–40%,
+samo 4 ispod 20%, 3 iznad 60%, **nijednu iznad 80%**; Elo je u rubove stavio 27 odnosno 15.
+DC gura sve prema sredini. Kad je rekao „46%", palo je u **67%** slučajeva — bio je u pravu
+češće nego što je sam sebi vjerovao. To nije anegdota nego izravan ulaz u §6: izotonička
+kalibracija popravlja točno ovaj oblik greške, i sad postoji brojka prema kojoj se mjeri.
+
+**2. Usporedba modela na različitim skupovima je tiha laž, pa je struktura sprječava.**
+`dc-market-v1` uveden je usred turnira (97 od 104), a kvota ima za 12 utakmica. Prva verzija
+izvještaja imala je jedan `common` presjek preko svih — i on je pao na **n=11**, jer 12
+kvota sreže sve. Sad su to dvije odvojene brojke: `common` (samo naši modeli, n=97, jedini
+legitiman poredak) i `vsMarket` (n=11, objavljen s izričitom ogradom). Svaki agregat nosi
+svoj `n`; nema agregata bez njega.
+
+**3. `0 === 0` je zamka koja bi zaključala §4.** Naivni `played === total` za freeze je
+točan za završen turnir i **katastrofalan** za tek onboardano natjecanje: prazna sezona ga
+zadovoljava, proglasi se arhivom i zamrzne poslove koji je trebaju napuniti — sezona koja
+nikad ne može početi. Otud `total > 0` u `isSeasonComplete`, s vlastitim testom. Pravilo je
+namjerno o *poznatim utakmicama*, ne o veličini turnira: nema konstante oblika 104 koja bi
+preživjela u §4 (test pokriva i ligu od 380).
+
+**4. `refresh --full` je bio jedini stadij bez gatea.** Sync gate, ko gate i publish gate su
+postojali; hourly refresh je i nakon finala svaki sat dizao Chrome i zvao mrtvi proxy.
+Novi `should-refresh.ts` to zatvara, i **fail-OPEN** je (za razliku od sync gatea): refresh
+ne troši kredite, pa kvar koji ne smijemo dopustiti nije „potrošen kredit" nego „tiho
+zamrznuta živa sezona".
+
+**5. Zamrznuti SKIP mora zvučati drugačije od „između kola".** Isti tekst u oba slučaja je
+točno ono zbog čega su ispadi 2026-06/07 mjesec dana prošli neopaženo. Sad piše
+`sezona arhivirana (104/104 odigrano)`. Heartbeat se i dalje piše na svakom ticku uključujući
+zamrznuti — potvrđeno nakon deploya: `ingest tick svjež (0.0 h)`, banner se ne prikazuje.
+
+**6. `.env` postavlja `SUPABASE_DB_URL` i to nije isto što i default.** `should-sync` se
+pokreće s `--env-file-if-exists=.env`, `should-publish` bez njega — dakle s *različitim
+vjerodajnicama*. Provjereno: isti host/port/baza, razlikuje se samo korisnik/lozinka, pa u
+praksi nema razilaženja i novi gate radi identično s `.env` i bez njega. Ali ako se ikad
+promijeni host u `.env`, dva gatea bi čitala dvije baze. **Za §4: ujednačiti pokretanje.**
+
+**Regresija (crvena linija):** digest `wc2026_match` **bit-identičan prije i poslije**
+(`0153c0b9424e105c38de054450a3009f`), publish gate SKIP, 90/90 testova, typecheck i build
+čisti, live `/`, `/scorecard`, `/bracket`, `/accuracy`, `/blog` sve 200.
+
+> ⚠ **Ispravak dokumentacije:** §2 epilog gore navodi digest `c6cb0df6…` kao referentnu
+> vrijednost. Ta vrijednost **više ne vrijedi** — stvarni digest zadnjeg publisha (i trenutnog
+> stanja baze) je `0153c0b9…`, zapisan u `fetcher/snapshot/.last-publish-digest` 20.7. u
+> 01:45. Baza i objavljeni snapshot su u skladu (gate SKIP), pa je razlika povijesna, ne kvar.
+> Za buduće regresijske provjere koristiti `0153c0b9…`, odnosno — bolje — pročitati aktualnu
+> vrijednost iz `.last-publish-digest` umjesto oslanjanja na broj prepisan u dokumentu.
+
+**Sitno usput:** dva UI stringa (`bracket.note`, hr+en) spominjala su izvor podataka poimence —
+uklonjeno po standalone pravilu brenda. Iz `docs/20` uklonjen zalutali `</content></invoke>`
+artefakt s kraja datoteke; A4 označen ✅.
+
+---
+
 ## 4. PROMPT — Generalizacija, faza 1: registry natjecanja + KV namespacing
 
 **Analiza (inventura codebase-a, 2026-07-20):** dobra vijest — **shema baze je stvarno

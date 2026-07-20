@@ -143,6 +143,19 @@ export async function getCalibration(): Promise<import('./types').Calibration> {
 }
 
 /**
+ * End-of-competition report (docs/21 §3A) — per-model, per-phase scores, calibration and the
+ * biggest misses, precomputed at export. Null before a competition finishes, and tolerant of
+ * a snapshot published before the key existed.
+ */
+export async function getReport(): Promise<import('./types').FinalReport | null> {
+  try {
+    return ((await kv().get('report', 'json')) as import('./types').FinalReport | null) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Pipeline health, written by the fetcher's health check (docs/21 §2A). Null when the key has
  * never been published — the banner must degrade to showing nothing rather than to an error, so
  * a health-reporting mechanism can never itself take the site down.

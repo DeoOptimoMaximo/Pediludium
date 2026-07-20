@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { alert } from './alert.ts';
 import { closeDb } from './db.ts';
-import { loadDueMatches, recordHeartbeat, STRANDED_AFTER_D } from './ops.ts';
+import { loadDueMatches, loadSeasonProgress, recordHeartbeat, STRANDED_AFTER_D } from './ops.ts';
 
 /**
  * Schedule-aware gate for the frequent match-sync job (scripts/match-sync.sh).
@@ -54,15 +54,25 @@ async function clearFailures(): Promise<void> {
 }
 
 async function main(): Promise<number> {
-  const due = await loadDueMatches();
+  const [due, season] = await Promise.all([loadDueMatches(), loadSeasonProgress()]);
   await clearFailures();
   // Liveness beat for the health check. Deliberately recorded on SKIP as well as PROCEED: this
   // gate runs every 15 minutes and can only get here if Postgres answered, which makes it the
   // one signal that stays fresh in a healthy but idle system (an archived season legitimately
   // has nothing to fetch for months). Hanging liveness off refresh:fc instead would mean a
   // finished tournament looked identical to a broken ingest — an alarm that cries wolf forever.
-  await recordHeartbeat('sync-gate', true, { due: due.length });
+  await recordHeartbeat('sync-gate', true, { due: due.length, frozen: season.complete });
 
+  // An archived season is a distinct kind of quiet from "between matchdays", and the log has to
+  // say which — a SKIP that reads the same either way is exactly what made the 2026-06/07 outages
+  // take a month to notice. The job is NOT disabled: it keeps ticking (and keeps the heartbeat
+  // fresh) so the same launchd plumbing drives the next competition without being re-armed.
+  if (season.complete) {
+    console.log(
+      `[sync-gate] SKIP — sezona arhivirana (${season.played}/${season.total} odigrano), nema više posla`,
+    );
+    return EXIT_SKIP;
+  }
   if (due.length === 0) {
     console.log('[sync-gate] SKIP — nijedna utakmica nije na redu za provjeru');
     return EXIT_SKIP;
