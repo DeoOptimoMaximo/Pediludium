@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { encodeHeader, isDue } from './alert.ts';
-import { backoffMinutes } from './ops.ts';
+import { backoffMinutes, isSeasonComplete } from './ops.ts';
 
 /**
  * Guards on the two pure decisions behind the resilience work (docs/21 §2). Both encode a
@@ -81,5 +81,33 @@ describe('isDue — alert cooldown', () => {
 
   it('fails open on an unparseable timestamp — a corrupt state file must not mute the pager', () => {
     expect(isDue('not-a-date', now, 6)).toBe(true);
+  });
+});
+
+describe('isSeasonComplete — the freeze condition (docs/21 §3B)', () => {
+  it('freezes a season whose every fixture has been played', () => {
+    expect(isSeasonComplete(104, 104)).toBe(true);
+  });
+
+  it('does NOT freeze an empty season — the trap that would brick a new competition', () => {
+    // 0 === 0 satisfies a naive played === total. A competition onboarded but not yet
+    // ingested would declare itself an archive and freeze the jobs meant to fill it,
+    // leaving a season that can never start. This is the single most important case here.
+    expect(isSeasonComplete(0, 0)).toBe(false);
+  });
+
+  it('keeps a season live while a single fixture is outstanding', () => {
+    expect(isSeasonComplete(103, 104)).toBe(false);
+    expect(isSeasonComplete(0, 104)).toBe(false);
+  });
+
+  it('stays frozen if more finished rows are seen than fixtures counted', () => {
+    // Defensive: a counting skew must not un-freeze and restart hourly fetching forever.
+    expect(isSeasonComplete(105, 104)).toBe(true);
+  });
+
+  it('is independent of tournament size — no 104-shaped constant survives into §4', () => {
+    expect(isSeasonComplete(380, 380)).toBe(true); // a 20-team double round-robin league
+    expect(isSeasonComplete(379, 380)).toBe(false);
   });
 });

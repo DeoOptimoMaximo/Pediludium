@@ -47,7 +47,15 @@ step() {
 HOUR=$(date +%H)
 echo "[$(date -u +%FT%TZ)] ===== hourly snapshot tick (local hour $HOUR) ====="
 
-step npm run refresh -- --full
+# Freeze gate (src/should-refresh.ts, docs/21 §3B): an archived season cannot change, so
+# there is nothing to re-fetch. Skipping keeps the log readable and costs nothing to re-arm —
+# the gate opens by itself the moment a competition with unplayed fixtures exists. It fails
+# OPEN, so a DB hiccup can never silently freeze a live season.
+if node --env-file-if-exists=.env src/should-refresh.ts; then
+  step npm run refresh -- --full
+else
+  echo "[$(date -u +%FT%TZ)] ⏸ refresh preskočen — sezona arhivirana"
+fi
 # enrich now works via the piggyback match-view harvest (lineups/odds/votes), but is left
 # OFF in cron for now: each match view is a ~10-15s SPA navigation, and nothing in the UI
 # consumes match_odds/votes yet (and xG/shotmap still need the Statistics sub-tab, docs/15).

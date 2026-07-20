@@ -47,6 +47,48 @@ export async function loadHeartbeats(): Promise<Heartbeat[]> {
   return rows.map((r) => ({ key: r.key, at: r.at, ok: r.ok, age_h: Number(r.age_h) }));
 }
 
+/* ── season freeze (docs/21 §3B) ────────────────────────────────────────── */
+
+export interface SeasonProgress {
+  played: number;
+  total: number;
+  /** every fixture we know about has a result → the competition is an archive */
+  complete: boolean;
+}
+
+/**
+ * Is this season finished for good?
+ *
+ * THE TRAP, and the reason this is a named function with its own tests rather than an
+ * inline `played === total`: an empty season also satisfies played === total (0 === 0).
+ * A newly onboarded competition, before its first ingest, would declare itself complete
+ * and freeze the very jobs meant to fill it — a competition that can never start. The
+ * `total > 0` clause is the whole point.
+ *
+ * Note this is deliberately about FIXTURES WE KNOW, not a hardcoded 104. The next
+ * competition (docs/21 §4) has a different size, and hardcoding a count is exactly the
+ * kind of WC-shaped constant that generalisation has to remove.
+ */
+export function isSeasonComplete(played: number, total: number): boolean {
+  return total > 0 && played >= total;
+}
+
+/** Fixture counts for a season, and whether it has been played to the end. */
+export async function loadSeasonProgress(
+  seasonId: number = WORLD_CUP.seasonId2026,
+): Promise<SeasonProgress> {
+  const rows = await dbQuery<{ played: string; total: string }>(
+    `select count(*) filter (where status_type = 'finished') as played,
+            count(*) as total
+       from public.match where season_id = $1`,
+    [seasonId],
+  );
+  // node-pg returns count() as a string — Number() or the comparison silently lies
+  const played = Number(rows[0]?.played ?? 0);
+  const total = Number(rows[0]?.total ?? 0);
+  return { played, total, complete: isSeasonComplete(played, total) };
+}
+
 /* ── catch-up window + per-match backoff ────────────────────────────────── */
 
 /**
