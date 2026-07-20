@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { getLang, getUiPrefs } from '@/lib/lang';
+import { HealthBanner } from './components/HealthBanner';
 import { Nav } from './components/Nav';
 
 const SITE_URL = 'https://nogomet.domovina.ai';
@@ -50,6 +51,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang={lang} data-theme={theme} data-layout={layout}>
       <body>
         <Nav lang={lang} theme={theme} layout={layout} />
+        <HealthBanner lang={lang} />
         <main className="container">{children}</main>
         <script
           defer

@@ -287,6 +287,24 @@ sequenceDiagram
 Lock (`mkdir /tmp/...lock`) sprječava preklapanje; neuspjeli korak se loga i lanac nastavlja
 („stale-but-consistent snapshot bolji od ničega"). Skripta: `fetcher/scripts/hourly-snapshot.sh`.
 
+### 8.1 Operativna otpornost (docs/21 §2)
+
+Ta ista „nastavi dalje" filozofija je 2026-06/07 sakrila **18 ispada Postgresa** (najdulji ~6
+dana): svaki gate tretira nedostupnu bazu kao „nema posla" — ispravno, jer mrtva baza ne smije
+trošiti Firecrawl kredite — pa je sve izlazilo s exit 0 i nitko ništa nije primijetio. Tri sloja
+to zatvaraju:
+
+| Sloj | Gdje | Što radi |
+|------|------|----------|
+| **Health/alert** | `src/health.ts`, launchd `com.pediludium.health` (30 min) | provjeri bazu, starost ingest heartbeata, zaglavljene utakmice, proxy, starost publisha → ntfy (cooldown 6 h/tip) + KV ključ `health` |
+| **Catch-up** | `src/ops.ts` + `should-sync.ts` | prozor provjere je **stanje utakmice**, ne zidni sat: neodigrana-a-započeta ostaje na redu do 14 dana, uz eskalirajući backoff po utakmici (15 min → 1 h → 6 h → 24 h) |
+| **Self-heal** | `scripts/supabase-guard.sh` | health izlazi kodom 2 kad baza padne → guard digne Docker/kontejnere → ponovna provjera; alarm ide tek ako oporavak ne uspije |
+
+Ključna invarijanta: **liveness heartbeat piše `should-sync` na svakom ticku, i na SKIP-u**
+(tablica `ops_heartbeat`). Vezati ga uz stvarni dohvat značilo bi da završen turnir izgleda
+identično mrtvom ingestu — alarm koji trajno laje nitko ne sluša. Isto vrijedi za banner na
+webu: pali se samo kad *postoje odigrane utakmice bez rezultata*, ne kad je sezona arhivirana.
+
 ---
 
 ## 9. Web aplikacija

@@ -145,6 +145,18 @@ export interface Movers {
   teams: MoverRow[];
 }
 
+/**
+ * Pipeline health as published by the fetcher's health check into the `health` KV key
+ * (docs/21 §2A). The site reads it only to be honest with visitors about data freshness —
+ * during the 2026-07 outage the scorecard showed a nine-day-old result with no indication
+ * that anything was wrong, which is the one thing a "verifiable predictions" site must not do.
+ */
+export interface Health {
+  generated_at: string;
+  level: 'ok' | 'warn' | 'red';
+  checks: { id: string; level: 'ok' | 'warn' | 'red'; message: string; detail?: Record<string, unknown> }[];
+}
+
 // model_version identifiers used across the app (the schema versions predictions/sims)
 export const BASELINE_MODEL = 'baseline-poisson-elo-v1';
 export const DC_MODEL = 'dixon-coles-v1';

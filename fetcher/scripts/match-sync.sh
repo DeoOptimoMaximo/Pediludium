@@ -8,11 +8,15 @@
 # just ended, so credits are spent on the handful of live games, not round the clock.
 #
 # Flow each tick:
-#   should-sync gate (cheap DB check: any match in [now-4h, now+15m] and not finished?)
-#     └─ yes → refresh:fc (Firecrawl, windowed to 4h) → if match reality changed (should-publish):
+#   should-sync gate (cheap DB check: any match kicked off, still unfinished, and past its
+#                     per-match backoff? — src/ops.ts)
+#     └─ yes → refresh:fc (Firecrawl) → if match reality changed (should-publish):
 #                 standings → predict:dc → predict:dcm → simulate → history:record → snapshot
 #     └─ no  → exit (0 credits, 0 work)
 # Result: a finished match shows up on the live site within ~15 min, with 2-3 in-play refreshes.
+#
+# Eligibility is match STATE, not wall clock (docs/21 §2B). The original [now-18h, now+15m]
+# window quietly abandoned anything played while the DB was down; catch-up is now the default.
 #
 # Shares the hourly job's lock so the two never recompute/publish concurrently.
 
@@ -28,10 +32,22 @@ step() {
   "$@" || echo "[$(date -u +%FT%TZ)] ⚠ step failed (exit $?) — continuing"
 }
 
-# Cheap, credit-free gate first — bail before taking the lock if nothing is in play.
-if ! node src/should-sync.ts; then
+bash "$FETCHER_DIR/scripts/logrotate.sh"
+
+# Cheap, credit-free gate first — bail before taking the lock if nothing is due.
+#
+# The gate's own output is captured and re-emitted as ONE timestamped line (docs/21 §2D). It used
+# to print bare "[sync-gate] SKIP" straight to the log: 2 MB of undated lines, so reconstructing
+# WHEN the June/July outages started meant writing a script to carry the last dated line forward.
+# Every tick now leaves exactly one dated, greppable record of its outcome.
+GATE_OUT=$(node --env-file-if-exists=.env src/should-sync.ts 2>&1)
+GATE_RC=$?
+GATE_MSG=$(printf '%s\n' "$GATE_OUT" | tail -1)
+if [ "$GATE_RC" -ne 0 ]; then
+  echo "[$(date -u +%FT%TZ)] match-sync SKIP — $GATE_MSG"
   exit 0
 fi
+echo "[$(date -u +%FT%TZ)] match-sync PROCEED — $GATE_MSG"
 
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   echo "[$(date -u +%FT%TZ)] match-sync: pipeline busy — skipping this tick"
@@ -48,11 +64,13 @@ echo "[$(date -u +%FT%TZ)] ===== match-sync tick ====="
 ROTATE="$HOME/.config/firecrawl/rotate.sh"
 [ -x "$ROTATE" ] && step bash "$ROTATE"
 
-# Firecrawl result fetch, windowed to matches in/just-after play (independent of the proxy).
-# 18h window matches the should-sync gate: covers an overnight so an evening match that
-# finishes while ticks are stale/asleep is still caught (and re-fetched FRESH — refresh:fc
-# forces --max-age 0). A match drops out the moment it's marked finished, so cost stays low.
-step env REFRESH_FC_SINCE_H=18 npm run refresh:fc
+# Firecrawl result fetch (independent of the proxy). No REFRESH_FC_SINCE_H any more: the window
+# is no longer wall-clock but match STATE plus a per-match backoff ladder (src/ops.ts, docs/21
+# §2B), which is what makes catch-up automatic. Under the old 18h window a match played while
+# Postgres was down had aged out before the DB came back and was never re-checked — five World
+# Cup results were lost that way. A match now stays due until it is finished or 14 days old,
+# while the ladder keeps a permanently stranded fixture from burning ~96 credits a day.
+step npm run refresh:fc
 
 # Knockout phase: once a tie's feeder matches are finished, re-point its placeholder slots
 # (2A / W73 …) to the real qualifiers — credit-free gate fires only when something is newly

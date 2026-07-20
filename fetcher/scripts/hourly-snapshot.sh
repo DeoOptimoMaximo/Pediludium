@@ -30,6 +30,8 @@ LOCK_DIR="/tmp/pediludium-snapshot.lock"
 
 cd "$FETCHER_DIR" || exit 1
 
+bash "$FETCHER_DIR/scripts/logrotate.sh"
+
 # no overlap: a long nightly run simply makes the next hourly tick skip
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   echo "[$(date -u +%FT%TZ)] previous run still active — skipping"

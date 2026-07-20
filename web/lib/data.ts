@@ -34,3 +34,11 @@ export const getMovers = impl.getMovers;
 export const getSnapshotMeta: () => Promise<{ generated_at: string } | null> = isSnapshot
   ? snapshot.getSnapshotMeta
   : async () => null;
+
+/**
+ * Pipeline health from the `health` KV key (docs/21 §2A). Always null in local dev, where the
+ * page reads Postgres directly and "is the published snapshot stale?" has no meaning.
+ */
+export const getHealth: () => Promise<import('./types').Health | null> = isSnapshot
+  ? snapshot.getHealth
+  : async () => null;

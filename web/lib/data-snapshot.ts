@@ -142,6 +142,19 @@ export async function getCalibration(): Promise<import('./types').Calibration> {
   return ((await kv().get('calib', 'json')) as import('./types').Calibration | null) ?? {};
 }
 
+/**
+ * Pipeline health, written by the fetcher's health check (docs/21 §2A). Null when the key has
+ * never been published — the banner must degrade to showing nothing rather than to an error, so
+ * a health-reporting mechanism can never itself take the site down.
+ */
+export async function getHealth(): Promise<import('./types').Health | null> {
+  try {
+    return ((await kv().get('health', 'json')) as import('./types').Health | null) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Per-team change in advance / title odds over the recent window (swing chart). */
 export async function getMovers(): Promise<import('./types').Movers | null> {
   return ((await kv().get('movers', 'json')) as import('./types').Movers | null) ?? null;

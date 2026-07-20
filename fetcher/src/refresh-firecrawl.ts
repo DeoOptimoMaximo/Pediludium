@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { closeDb, dbQuery } from './db.ts';
 import { WORLD_CUP } from './config.ts';
+import { loadDueMatches, recordHeartbeat, recordSyncAttempt } from './ops.ts';
 
 /**
  * Fallback result sync via Firecrawl (`npm run refresh:fc`).
@@ -23,10 +24,13 @@ import { WORLD_CUP } from './config.ts';
 const S = WORLD_CUP.seasonId2026;
 const MAX = Number(process.env.REFRESH_FC_MAX ?? 12);
 const DRY = process.env.REFRESH_FC_DRY === '1';
-// How far back to look for started-but-unfinished matches. The schedule-aware match-sync
-// job sets this small (e.g. 4h) so it only checks matches actually in play / just ended;
-// a manual catch-up run can widen it. Default 60h covers a multi-day backlog.
-const SINCE_H = Number(process.env.REFRESH_FC_SINCE_H ?? 60);
+/**
+ * Manual override: a raw wall-clock window in hours, ignoring per-match backoff. Unset in cron —
+ * the scheduled path now uses the state-based catch-up in ops.ts (docs/21 §2B), which never lets
+ * a match fall out of scope just because time passed. Kept as the operator's escape hatch for a
+ * forced sweep (`REFRESH_FC_SINCE_H=400 npm run refresh:fc`, as used for the §1 recovery).
+ */
+const SINCE_H = process.env.REFRESH_FC_SINCE_H ? Number(process.env.REFRESH_FC_SINCE_H) : null;
 
 interface Cand {
   ss_id: number;
@@ -36,9 +40,11 @@ interface Cand {
   away: string | null;
   status_type: string | null;
   start_ts: string | null;
+  attempts: number;
 }
 
-async function loadCandidates(): Promise<Cand[]> {
+/** Wall-clock sweep — only when the operator explicitly asks for one via REFRESH_FC_SINCE_H. */
+async function loadCandidatesWindowed(sinceH: number): Promise<Cand[]> {
   // home/away come from the RESOLVED team_id joins — the same source the wc2026_match view
   // uses to render names — NOT raw.homeTeam/awayTeam. parseResultMarkdown verifies the score
   // orientation against these names, so the score is always attributed to the team we actually
@@ -59,9 +65,30 @@ async function loadCandidates(): Promise<Cand[]> {
         and m.start_ts > now() - make_interval(hours => $2)
         and m.status_type is distinct from 'finished'
       order by m.start_ts`,
-    [S, SINCE_H],
+    [S, sinceH],
   );
-  return rows.map((r) => ({ ...r, ss_id: Number(r.ss_id) }));
+  return rows.map((r) => ({ ...r, ss_id: Number(r.ss_id), attempts: 0 }));
+}
+
+/**
+ * The scheduled path: whatever ops.ts says is due, filtered to rows we can actually build a URL
+ * for. A slot still carrying a placeholder slug has nothing to scrape — resolve:ko has to point
+ * it at a real fixture first — so it is skipped here rather than wasted as a 404 credit.
+ */
+async function loadCandidatesDue(): Promise<Cand[]> {
+  const due = await loadDueMatches(S);
+  return due
+    .filter((d) => d.slug && d.cid)
+    .map((d) => ({
+      ss_id: d.ss_id,
+      slug: d.slug as string,
+      cid: d.cid as string,
+      home: d.home,
+      away: d.away,
+      status_type: d.status_type,
+      start_ts: d.start_ts,
+      attempts: d.attempts,
+    }));
 }
 
 const MONTHS: Record<string, number> = {
@@ -238,12 +265,16 @@ async function applyResult(c: Cand, e: Extracted): Promise<boolean> {
 }
 
 async function main(): Promise<void> {
-  const cands = (await loadCandidates()).slice(0, MAX);
+  const cands = (SINCE_H === null ? await loadCandidatesDue() : await loadCandidatesWindowed(SINCE_H)).slice(0, MAX);
   if (cands.length === 0) {
-    console.log('[refresh:fc] no in-play/recent matches to update');
+    console.log('[refresh:fc] no matches due a result check');
+    if (!DRY) await recordHeartbeat('refresh:fc', true, { checked: 0, updated: 0 });
     return;
   }
-  console.log(`[refresh:fc] checking ${cands.length} matches via Firecrawl${DRY ? ' (DRY RUN)' : ''}`);
+  console.log(
+    `[refresh:fc] checking ${cands.length} matches via Firecrawl` +
+      `${SINCE_H === null ? '' : ` (forced ${SINCE_H}h window)`}${DRY ? ' (DRY RUN)' : ''}`,
+  );
   let updated = 0;
   let rescheduled = 0;
   for (const c of cands) {
@@ -251,9 +282,18 @@ async function main(): Promise<void> {
     const { e, kickoff } = scrapeResult(url, c.home, c.away);
     if (!e) {
       console.warn(`[refresh:fc] ${c.home} v ${c.away}: no result extracted`);
+      // A scrape that produced nothing still counts as an attempt — otherwise a match whose page
+      // is permanently unscrapeable (dead slug) would retry every 15 minutes for ever.
+      if (!DRY) await recordSyncAttempt(c.ss_id, c.attempts, { resolved: false, status: 'error' });
       continue;
     }
     const changed = await applyResult(c, e);
+    if (!DRY) {
+      await recordSyncAttempt(c.ss_id, c.attempts, {
+        resolved: e.status === 'finished' && changed,
+        status: e.status,
+      });
+    }
     const tag = changed ? (DRY ? 'WOULD UPDATE' : 'updated') : 'skip (notstarted/partial)';
     console.log(`[refresh:fc] ${c.home} v ${c.away}: ${e.home_score ?? '-'}-${e.away_score ?? '-'} ${e.status} → ${tag}`);
     if (changed) updated++;
@@ -270,6 +310,9 @@ async function main(): Promise<void> {
     `[refresh:fc] ${DRY ? 'would update' : 'updated'} ${updated}/${cands.length} matches` +
       (rescheduled ? `, ${rescheduled} kickoff${rescheduled > 1 ? 's' : ''} corrected` : ''),
   );
+  // Reaching here means the ingest path worked end to end (Firecrawl answered, DB accepted the
+  // writes) — that, not "the launchd job exited 0", is what the health check trusts.
+  if (!DRY) await recordHeartbeat('refresh:fc', true, { checked: cands.length, updated });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
